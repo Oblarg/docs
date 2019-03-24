@@ -51,9 +51,67 @@ The rewritten Command-based framework seeks to rectify the above problems.  A br
 
 ### In-Depth Examples (How Does it Work?)
 
-#### The CommandScheduler
+#### Command
 
-The central class of the Command-based rewrite is the `CommandScheduler`.  The `CommandScheduler` serves the function of the `Scheduler` in the previous command framework.  It has been entirely rewritten to use modern Java collections APIs, and to have a much simpler and more readable control flow than the previous `Scheduler`.  The `CommandScheduler` remains a singleton, to allow global access from across the robot program - this is important for facilitating convenience methods in both the `Command` and `Subsystem` interfaces, as well as not requiring users to inject a `Scheduler` across their entire codebase, which is tedious and provides little real benefit.  However, the new library does a much better job of avoiding rigid coupling to the `Scheduler` object, even though it is globally-acessible.
+As mentioned earlier, `Command` has been refactored to be an interface.  This has changed surprisingly little about how users interact with it, as its user-facing function in the original library was mostly that of an interface to begin with.
+
+##### Basic state machine logic
+
+```java
+default void initialize() {}
+default void execute() {}
+default void interrupted() { end(); }
+default void end() {}
+default boolean isFinished() { return true; }
+default boolean runsWhenDisabled() { return false; }
+```
+
+These work exactly as before.  They are defaulted for convenience, so that overriding is not necessary if one does not wish to use one of them.  The only difference is that to specify run-when-disabled behavior, one must now override the `runsWhenDisabled()` method instead of calling a `setRunsWhenDisabled()` method (which is not feasible, as `Command` is no longer stateful).
+
+##### Handling equirements
+
+```java
+Set<Subsystem> getRequirements();
+default boolean requires(Subsystem requirement)
+```
+
+`Command`s declare their `Subsystem` requirements by overriding the `getRequirements` method.  Users are advised to include their requirements as a field in their `Command` implementation, to avoid needless reallocation when this method is called.  The provided `SendableCommandBase` class does this for users, as well as providing a simpler `addRequirements()`-based API.  This method is not defaulted, to ensure users do not forget about it.
+
+The `requires()` method returns whether the given subsystem is a requirement.  Note that this is very different from its functionality in the previous framework - but the name is indicative of a query rather than an action, to begin with, and the method signature has changed, which should alert users to its different function.
+
+##### Convenience wrappers on CommandScheduler methods
+
+```java
+default void schedule(boolean interruptible)
+default void schedule() { schedule(true); }
+default void cancel()
+default boolean isScheduled()
+```
+
+These methods simply wrap the `CommandScheduler` methods for convenience, and are self-explanatory.
+
+##### Composeable decorators
+
+```java
+default Command withTimeout(double seconds)
+default Command interruptOn(BooleanSupplier condition)
+default Command whenFinished(Runnable toRun)
+default Command beforeStarting(Runnable toRun)
+default Command andThen(Command... next)
+default Command alongWith(Command... parallel)
+default Command asWellAs(Command... parallel)
+default Command raceWith(Command... parallel)
+```
+
+These methods compose the given command within a CommandGroup for added functionality.  They are extremely concise and powerful, and pretty self-explanatory.  The three parallel methods correspond with `ParallelDictatorGroup`, `ParallelCommandGroup`, and `ParallelRaceGroup`, respectively.  With these, one can create quite-substantial structures in only a small bit of code:
+
+```java
+button.whenPressed(foo.raceWith(bar.andThen(baz.withTimeout(5))));
+```
+
+#### CommandScheduler
+
+The `CommandScheduler` serves the function of the `Scheduler` in the previous command framework.  It has been entirely rewritten to use modern Java collections APIs, and to have a much simpler and more readable control flow than the previous `Scheduler`.  The `CommandScheduler` remains a singleton, to allow global access from across the robot program - this is important for facilitating convenience methods in both the `Command` and `Subsystem` interfaces, as well as not requiring users to inject a `Scheduler` across their entire codebase, which is tedious and provides little real benefit.  However, the new library does a much better job of avoiding rigid coupling to the `Scheduler` object, even though it is globally-acessible.
 
 The `CommandScheduler` API is very simple:
 
