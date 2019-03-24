@@ -15,6 +15,7 @@ The problems with the current command framework fall generally into three major 
 1.  Poor readability/maintainability.
 2.  Poor encapsulation/separation of responsibilities.
 3.  Unnecessarily restrictive API design.
+4.  Clutter
 
 These three problems are interrelated, but I will summarize each in turn.
 
@@ -35,6 +36,10 @@ Because the division-of-responsibilities is so ambiguous, large amounts of state
 Additionally, `CommandGroup` is a confusing and difficult-to-use class whose structure serves to obscure the potential power of its abstraction.  The `addParallel()` and `addSequential()` API is unintuitive, and unnecessary - structures that can be built within a `CommandGroup` through these methods can be more-cleanly built through multiple `CommandGroup`s combined through recursive composition.
 
 Finally, the API has been designed almost exclusively for use through the subclassing of `Command` and `CommandGroup`.  Additions circumventing this pattern do exist (e.g. `InstantCommand`), but much Command-based code is needlessly verbose.  The API's classes are, by-and-large, not usable as-is; they are usable only as foundations for user implementations.  This makes it unduly difficult for new teams to accomplish simple tasks, such as configuring working drive code, in comparison to a simple state machine in `Robot.java`.  As the benefits of the Command-based framework are not seen until teams begin to attempt more-complicated robot functionality, many teams who are initially discouraged by this end up without those benefits when they are needed; and even teams that stick with it are saddled with unnecessary verbosity for simple tasks.
+
+### Problem 4: The API Is Really, Really Cluttered
+
+Because of deeper issues with separation-of-concerns between the Command-based libraries and the `Sendable` implementation, many `Command`s have long lists of overloaded constructors and other cruft that make the code difficult to navigate and provide little useful functionality to the users.  The `PIDCommand` class is a particularly egregious example.
 
 Overall, the problems with the library run deep enough that an attempt to modify the existing structure would likely be futile.  Large, breaking changes are needed to address the concerns raised above.
 
@@ -160,6 +165,8 @@ The first two are self-explanatory.
 
 As in the previous library, all command groups require the union of the requirements of their components.  This may seem cumbersome, but teams that wish to circumvent it are free to neglect to declare requirements, or else use `ScheduleCommand` to fork off independently from a command group.  For most use-cases, this is the most-intuitive behavior, as requirements are only checked upon the initial scheduling of a command, and it is by far the easiest to implement and to maintain.
 
+Also as in the previous library, commands may not belong to more than one `CommandGroup`, and may not be independently scheduled if they are part of a `CommandGroup`.  This prevents inconsistent internal `Command` state.  This is accomplished by means of a weak static list of "allocated" `Command`s in the `CommandGroupBase` class.  Static methods are available for users to clear `Command`s from this list, if desired, but it is strongly warned against in the documentation as there are only a couple of legitimate use-cases for it.
+
 #### CommandScheduler
 
 The `CommandScheduler` serves the function of the `Scheduler` in the previous command framework.  It has been entirely rewritten to use modern Java collections APIs, and to have a much simpler and more readable control flow than the previous `Scheduler`.  The `CommandScheduler` remains a singleton, to allow global access from across the robot program - this is important for facilitating convenience methods in both the `Command` and `Subsystem` interfaces, as well as not requiring users to inject a `Scheduler` across their entire codebase, which is tedious and provides little real benefit.  However, the new library does a much better job of avoiding rigid coupling to the `Scheduler` object, even though it is globally-acessible.
@@ -173,7 +180,7 @@ void scheduleCommand(Command command, boolean interruptible);
 void scheduleCommands(boolean interruptible, Command... commands);
 ```
 
-The `interruptible` boolean sets if the command is permitted to be interrupted by a later-scheduled command that needs one of its required `Subsystems`.  When a `Command` is scheduled, the `CommandScheduler` first checks to see if its requirements are free.  If they are, the command is scheduled, its `initialize()` method is run, and its requirements are added to the list of currently-used requirements.  If its requirements are not all free, it is checked if all of the commands using requirements that it needs have been scheduled as `interruptible`; if they have, all of these commands are interrupted, their requirements are freed, and the command is scheduled as above.  If not, nothing is done.  The vararg version of the method simply runs the process repeatedly for multiple commands.
+The `interruptible` boolean sets if the command is permitted to be interrupted by a later-scheduled command that needs one of its required `Subsystems` (previously, this was set permanently for a given command - the new implementation is more flexible).  When a `Command` is scheduled, the `CommandScheduler` first checks to see if its requirements are free.  If they are, the command is scheduled, its `initialize()` method is run, and its requirements are added to the list of currently-used requirements.  If its requirements are not all free, it is checked if all of the commands using requirements that it needs have been scheduled as `interruptible`; if they have, all of these commands are interrupted, their requirements are freed, and the command is scheduled as above.  If not, nothing is done.  The vararg version of the method simply runs the process repeatedly for multiple commands.
 
 ##### Registering subsystems/default commands
 
@@ -223,3 +230,62 @@ void onCommandEnd(Consumer<Command> action);
 ````
 
 These provide a simple way to add a task for the scheduler to perform whenever a command is initialized, executed, interrupted, or ended.  For example, one could insert a logging call to mark the event.
+
+#### Sendable base classes
+
+The new Command library includes `Sendable` base classes for both `Command` and `Subsystem` that teams may (but are in no sense required) to use.  No constructor parameter for name is provided, to avoid inducing similar overloaded constructor clutter in subclasses as is seen in the original command-based library.  Teams can call the `setName()` method prior to sending if they wish to set a name.
+
+##### SendableCommandBase
+
+A base class for `Command`s that implements `Sendable`.  All provided `Command` implementations are built from this, as are the `CommandGroup`s.  Also provides a field for requirements, as is advised for implementations of `Command`, and a clean vararg `addRequirements()` method.
+
+##### SendableSubsystemBase
+
+A base class for `Subsystem`s that implements `Sendable`.
+
+#### Included command implementations
+
+The library comes with a very large array of `Command` implementations built from `SendableCommandBase`.  There are too many of these to be worth summarizing here, but they are quite well-documented and easy to grasp.  The majority of these are heavily functionalized, allowing use "out of the box" via. lambdas rather than requiring users to subclass them.  For example, a default drive command might be implemented in the following way:
+
+```java
+driveSubsystem.setDefaultCommand(new RunCommand(() -> driveSubsystem.tankDrive(leftJoystick.get(), rightJoystick.get()), driveSubsystem));
+```
+
+This is simple, straightforward, and requires no subclassing.  The prebuilt commands have been kept as general as possible, to avoid their number growing beyond what can be reasonably maintained, and to keep their dependencies to a minimum.
+
+#### PIDCommand and PIDSubsystem
+
+These convenience wrappers have been kept from the previous library in spirit, but have been greatly updated in implementation.  For starters, the new PIDController (courtesy of @calcmogul) is used, which is able to be run synchronously from the main loop.  Accordingly, `PIDCommand` and `PIDSubsystem` have been split into asynchronous and synchronous versions.  Thread safety warnings have been added to the asynchronous versions.
+
+Both `PIDCommand`s now take lambdas for setpoint, process variable, and output.  On the other hand, `PIDSubsystem` only takes a lambda for process variable measurement (and this will likely change when future updates to the PIDController move that lambda out of the controller object itself), as "out-of-the-box" use makes much less sense for a `Subsystem` than for a `Command` (as users will want to write their own class for the `Subsystem` anyway, in order to encapsulate resources within it).
+
+#### Trigger and Button
+
+The `Trigger` class has (and its subclasses) hardly been modified for the new library, and works nearly exactly as it did before.  However, some new additions are worth noting:
+
+##### Interruptible param
+
+All `Trigger` and `Button` classes have had an `interruptible` boolean added to their binding methods, to match the new feature of the `CommandScheduler`.  Overloaded methods have been provided that default this parameter to `true`.
+
+##### whileActiveOnce vs whileActiveContinuous
+
+The `whileActive()` method previously re-scheduled the command continuously while the trigger was active.  This has now been named `whileActiveContinuous()`, and a `whileActiveOnce()` method has been added that cancels the command when the trigger becomes inactive, but does not re-start it if it ends normally while the trigger is still active.  The corresponding `Button` method names are `whileHeld()` and `whenHeld()`.
+
+##### Runnable bindings
+
+The `whenActive`, `whileActiveContinuous`, and `whenInactive` bindings (and their corresponding `Button` equivalents) have been given the ability to take a `Runnable`, which is wrapped in an `InstantCommand` automatically.  This allows the use of the edge-finding logic for tasks that the user does not wish to write a command for.
+
+##### Trigger composition
+
+```java
+Trigger and(Trigger trigger);
+Trigger or(Trigger trigger);
+Trigger negate();
+```
+
+These allow `Trigger`s to be composed prior to button binding, a la:
+
+```java
+button1.and(button2).whenActive(...);
+```
+
