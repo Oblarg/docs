@@ -109,6 +109,57 @@ These methods compose the given command within a CommandGroup for added function
 button.whenPressed(foo.raceWith(bar.andThen(baz.withTimeout(5))));
 ```
 
+#### Subsystem
+
+The `Subsystem` class has, like `Command`, been refactored to be an interface rather than an abstract class.  It is also no longer responsible for keeping track of its own default `Command` - that responsibility now properly belongs to `CommandScheduler`.  As a result, there is really not much left in it, which is a good thing.
+
+Subsystems should be registered with the `CommandScheduler` through the `registerSubsystem` method.
+
+##### Periodic
+
+```java
+default void periodic() {}
+```
+
+A method that gets called once per run of the `CommandScheduler` on all registered `Subsystem`s.  Unchanged from the previous command framework.
+
+##### Default commands
+
+```java
+default void setDefaultCommand(Command defaultCommand)
+default Command getDefaultCommand()
+```
+
+While `Subsystem` is no longer responsible for managing its default `Command`, it does provide these two convenience wrappers on the relevant `CommandScheduler` methods.
+
+##### Querying command state
+
+```java
+default Command getCurrentCommand()
+```
+
+A convenience wrapper on the `CommandScheduler` method that returns whatever command is currently scheduled that requires this subsystem.
+
+#### Command Groups
+
+Command groups allow users to compose individual commands into more-complicated commands.  The `CommandScheduler` does *not* see command group internals; every command group appears to the scheduler as if it were a single command.  This maintains encapsulation, and allows compositions of arbitrary complexity without any modification to the `CommandScheduler`, resulting in a much easier to read and easier to maintain library.
+
+There are four basic types of Command groups:
+
+```java
+SequentialCommandGroup(Command... commands)
+ParallelCommandGroup(Command... commands)
+ParallelRaceGroup(Command... commands)
+ParallelDictatorGroup(Command... commands)
+```
+The first two are self-explanatory.  
+
+`ParallelRaceGeoup` is a parallel command group that terminates when the *first* of the included commands ends.  All other commands are interrupted at that point.
+
+`ParallelDictatorGroup` is a parallel command group that terminates when a specified one of the included commands (the "dictator") ends.  All other commands that are still running at that point are interrupted.
+
+As in the previous library, all command groups require the union of the requirements of their components.  This may seem cumbersome, but teams that wish to circumvent it are free to neglect to declare requirements, or else use `ScheduleCommand` to fork off independently from a command group.  For most use-cases, this is the most-intuitive behavior, as requirements are only checked upon the initial scheduling of a command, and it is by far the easiest to implement and to maintain.
+
 #### CommandScheduler
 
 The `CommandScheduler` serves the function of the `Scheduler` in the previous command framework.  It has been entirely rewritten to use modern Java collections APIs, and to have a much simpler and more readable control flow than the previous `Scheduler`.  The `CommandScheduler` remains a singleton, to allow global access from across the robot program - this is important for facilitating convenience methods in both the `Command` and `Subsystem` interfaces, as well as not requiring users to inject a `Scheduler` across their entire codebase, which is tedious and provides little real benefit.  However, the new library does a much better job of avoiding rigid coupling to the `Scheduler` object, even though it is globally-acessible.
@@ -123,6 +174,16 @@ void scheduleCommands(boolean interruptible, Command... commands);
 ```
 
 The `interruptible` boolean sets if the command is permitted to be interrupted by a later-scheduled command that needs one of its required `Subsystems`.  When a `Command` is scheduled, the `CommandScheduler` first checks to see if its requirements are free.  If they are, the command is scheduled, its `initialize()` method is run, and its requirements are added to the list of currently-used requirements.  If its requirements are not all free, it is checked if all of the commands using requirements that it needs have been scheduled as `interruptible`; if they have, all of these commands are interrupted, their requirements are freed, and the command is scheduled as above.  If not, nothing is done.  The vararg version of the method simply runs the process repeatedly for multiple commands.
+
+##### Registering subsystems/default commands
+
+```java
+void registerSubsystem(Subsystem... subsystem);
+void unregisterSubsystem(Subsystem... subsystem);
+void setDefaultCommand(Subsystem subsystem, Command defaultCommand);
+```
+
+These methods register subsystems so that their periodic methods will be called when the scheduler runs, and their default commands will be scheduled when they are not currently being required by other commands.  Setting a default command automatically registers the subsystem.
 
 ##### Running commands/subsystems
 
