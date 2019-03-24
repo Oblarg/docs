@@ -73,7 +73,7 @@ default boolean runsWhenDisabled() { return false; }
 
 These work exactly as before.  They are defaulted for convenience, so that overriding is not necessary if one does not wish to use one of them.  The only difference is that to specify run-when-disabled behavior, one must now override the `runsWhenDisabled()` method instead of calling a `setRunsWhenDisabled()` method (which is not feasible, as `Command` is no longer stateful).
 
-##### Handling equirements
+##### Handling Requirements
 
 ```java
 Set<Subsystem> getRequirements();
