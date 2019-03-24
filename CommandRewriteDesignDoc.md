@@ -1,7 +1,7 @@
 # WPILib Command Framework Rewrite
 Design document
 
-The WPILib Command-based framework has been a staple of Java and C++ robot code development for years, offering teams a relatively clean and sensible API for factoring complex robot code into simple, encapsulated chunks that interact in clear, comprehensible ways.  In addition to helping teams avoid the often substantial overhead of rolling their own state machine logic, it also serves as an important pedagogical tool for teaching teams concepts about encapsulation, control flow, and design patterns.
+The WPILib Command-based framework has been a staple of FRC Java and C++ robot code development for years, offering teams a relatively clean and sensible API for factoring complex robot code into simple, encapsulated chunks that interact in clear, comprehensible ways.  In addition to helping teams avoid the often substantial overhead of rolling their own state machine logic, it also serves as an important pedagogical tool for teaching teams concepts about encapsulation, control flow, and design patterns.
 
 However, the libraries used in the framework are now more than a decade old.  Many of the particular choices in their implementation are obsolete, and others are messy, difficult-to-maintain, and/or confusingly-conceived.  Given the confusing nature of much of the implementation, bringing the API up to modern standards is a difficult task, and the libraries have ended up in a "stasis" of sorts.
 
