@@ -38,3 +38,69 @@ Finally, the API has been designed almost exclusively for use through the subcla
 
 Overall, the problems with the library run deep enough that an attempt to modify the existing structure would likely be futile.  Large, breaking changes are needed to address the concerns raised above.
 
+## Overall Design of the Rewrite
+
+The rewritten Command-based framework seeks to rectify the above problems.  A broad overview of the changes introduced in the rewrite is as follows:
+
+1.  `Command` and `Subsystem` have been refactored to be interfaces instead of abstract classes.  This places much less imposition on user code, and also prevents scheduling responsibilities from leaking into them.  `Subsystem` is no longer required to have any knowledge of its default `Command`.
+2.  `Scheduler` (now named `CommandScheduler`) is solely responsible for the scheduling of commands (except as occurs through composition) and the handling of requirements.  All relevant scheduling state lives only in scheduler (as `Command` and `Subsystem` are now interfaces, and thus no no longer stateful), though some is further encapsulated in private `CommandState` objects.
+3.  `CommandGroup` has been split into several more-basic classes: `SequentialCommandGroup`, `ParallelCommandGroup`, `ParallelRaceGroup`, and `ParallelDictatorGroup`.  These classes implement the `Command` interface, and are thus composeable - the resulting composition-based API is both more-powerful and much cleaner than the previous `CommandGroup` class.
+4.  To facilitate composition of commands, `Command` has been given a large number of defaulted "decorator" methods which wrap the command with a decorated functionality, usually by means of one of the existing `CommandGroup` classes.
+5.  A large number of useable-out-of-the-box, lambda-based `Command` classes have been included.  In conjuction with the decorator methods mentioned above, these allow teams a simple, concise way to define powerful robot behaviors without writing any new classes.
+6.  `Sendable` implementations have been moved into abstract base classes, which are used as a base for the provided `Command` implementations and `CommandGroup` classes.  These are purely provided for user convenience, and users may disregard them and roll their own `Sendable` functionality if desired (though it is not really possible to decouple this from our pre-made `Command` implementations).
+
+### In-Depth Examples (How Does it Work?)
+
+#### The CommandScheduler
+
+The central class of the Command-based rewrite is the `CommandScheduler`.  The `CommandScheduler` serves the function of the `Scheduler` in the previous command framework.  It has been entirely rewritten to use modern Java collections APIs, and to have a much simpler and more readable control flow than the previous `Scheduler`.  The `CommandScheduler` remains a singleton, to allow global access from across the robot program - this is important for facilitating convenience methods in both the `Command` and `Subsystem` interfaces, as well as not requiring users to inject a `Scheduler` across their entire codebase, which is tedious and provides little real benefit.  However, the new library does a much better job of avoiding rigid coupling to the `Scheduler` object, even though it is globally-acessible.
+
+The `CommandScheduler` API is very simple:
+
+##### Scheduling commands
+
+```
+void scheduleCommand(Command command, boolean interruptible);
+void scheduleCommands(boolean interruptible, Command... commands);
+```
+
+The `interruptible` boolean sets if the command is permitted to be interrupted by a later-scheduled command that needs one of its required `Subsystems`.  When a `Command` is scheduled, the `CommandScheduler` first checks to see if its requirements are free.  If they are, the command is scheduled, its `initialize()` method is run, and its requirements are added to the list of currently-used requirements.  If its requirements are not all free, it is checked if all of the commands using requirements that it needs have been scheduled as `interruptible`; if they have, all of these commands are interrupted, their requirements are freed, and the command is scheduled as above.  If not, nothing is done.  The vararg version of the method simply runs the process repeatedly for multiple commands.
+
+##### Running commands/subsystems
+
+```
+void run();
+```
+
+This functions almost exactly as before, except the actual responsibility of tracking the scheduling state of the commands now does belong to the `CommandScheduler`.
+
+##### Canceling commands
+
+```
+void cancelCommand(Command... commands);
+void cancelAll();
+```
+
+Forceably ends the given commands, if they are currently scheduled.  The commands will have their `interrupt()` methods called, rather than their `end()` methods.  Note that a command can be cancelled ever if it is not scheduled as `interruptible` - the `interruptible` tag *only* determines if the command can be interrupted by *another command* through its requirements.
+
+##### Querying command state
+
+```
+boolean isScheduled(Command command);
+double timeSinceScheduled(Command command);
+Command requiring(Subsystem subsystem);
+Command getDefaultCommand(Subsystem subsystem);
+```
+
+These methods are fairly self-explanatory, and provide ways for the user to get information about the state of various `Command`s or `Subsystem`s.  They are often wrapped through convenience methods in the `Command` and `Subsystem` interfaces.  Note that `isScheduled()` and `timeSinceScheduled()` do not provide information about Commands that have been composed within CommandGroups - the scheduler does not see CommandGroup internals.
+
+##### Adding additional actions to perform on execution of command subroutines
+
+````
+void onCommandInitialize(Consumer<Command> action);
+void onCommandExecute(Consumer<Command> action);
+void onCommandInterrupt(Consumer<Command> action);
+void onCommandEnd(Consumer<Command> action);
+````
+
+These provide a simple way to add a task for the scheduler to perform whenever a command is initialized, executed, interrupted, or ended.  For example, one could insert a logging call to mark the event.
