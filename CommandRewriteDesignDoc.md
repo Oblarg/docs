@@ -59,7 +59,7 @@ The `CommandScheduler` API is very simple:
 
 ##### Scheduling commands
 
-```
+```java
 void scheduleCommand(Command command, boolean interruptible);
 void scheduleCommands(boolean interruptible, Command... commands);
 ```
@@ -68,7 +68,7 @@ The `interruptible` boolean sets if the command is permitted to be interrupted b
 
 ##### Running commands/subsystems
 
-```
+```java
 void run();
 ```
 
@@ -76,7 +76,7 @@ This functions almost exactly as before, except the actual responsibility of tra
 
 ##### Canceling commands
 
-```
+```java
 void cancelCommand(Command... commands);
 void cancelAll();
 ```
@@ -85,7 +85,7 @@ Forceably ends the given commands, if they are currently scheduled.  The command
 
 ##### Querying command state
 
-```
+```java
 boolean isScheduled(Command command);
 double timeSinceScheduled(Command command);
 Command requiring(Subsystem subsystem);
@@ -96,7 +96,7 @@ These methods are fairly self-explanatory, and provide ways for the user to get 
 
 ##### Adding additional actions to perform on execution of command subroutines
 
-````
+````java
 void onCommandInitialize(Consumer<Command> action);
 void onCommandExecute(Consumer<Command> action);
 void onCommandInterrupt(Consumer<Command> action);
