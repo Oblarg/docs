@@ -107,6 +107,7 @@ default Command andThen(Command... next)
 default Command dictating(Command... parallel)
 default Command alongWith(Command... parallel)
 default Command raceWith(Command... parallel)
+default Command perpetually()
 ```
 
 These methods compose the given command within a CommandGroup for added functionality.  They are extremely concise and powerful, and pretty self-explanatory.  The three parallel methods correspond with `ParallelDictatorGroup`, `ParallelCommandGroup`, and `ParallelRaceGroup`, respectively.  With these, one can create quite-substantial structures in only a small bit of code:
