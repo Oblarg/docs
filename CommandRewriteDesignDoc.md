@@ -65,24 +65,23 @@ As mentioned earlier, `Command` has been refactored to be an interface.  This ha
 ```java
 default void initialize() {}
 default void execute() {}
-default void interrupted() { end(); }
-default void end() {}
+default void end(boolean interrupted) {}
 default boolean isFinished() { return true; }
 default boolean runsWhenDisabled() { return false; }
 ```
 
-These work exactly as before.  They are defaulted for convenience, so that overriding is not necessary if one does not wish to use one of them.  The only difference is that to specify run-when-disabled behavior, one must now override the `runsWhenDisabled()` method instead of calling a `setRunsWhenDisabled()` method (which is not feasible, as `Command` is no longer stateful).
+These work exactly as before, with the exception of `end()`, which has been modified to fill the roll of both `end()` and `interrupted()` in the previous library (the method param indicates whether the command finished normally, or was interrupted).  They are defaulted for convenience, so that overriding is not necessary if one does not wish to use one of them.  The only difference is that to specify run-when-disabled behavior, one must now override the `runsWhenDisabled()` method instead of calling a `setRunsWhenDisabled()` method (which is not feasible, as `Command` is no longer stateful).
 
 ##### Handling requirements
 
 ```java
 Set<Subsystem> getRequirements();
-default boolean requires(Subsystem requirement)
+default boolean hasRequirement(Subsystem requirement)
 ```
 
 `Command`s declare their `Subsystem` requirements by overriding the `getRequirements` method.  Users are advised to include their requirements as a field in their `Command` implementation, to avoid needless reallocation when this method is called.  The provided `SendableCommandBase` class does this for users, as well as providing a simpler `addRequirements()`-based API.  This method is not defaulted, to ensure users do not forget about it.
 
-The `requires()` method returns whether the given subsystem is a requirement.  Note that this is very different from its functionality in the previous framework - but the name is indicative of a query rather than an action, to begin with, and the method signature has changed, which should alert users to its different function.
+The `hasRequirement()` method returns whether the given subsystem is a requirement.
 
 ##### Convenience wrappers on CommandScheduler methods
 
@@ -155,7 +154,7 @@ There are four basic types of Command groups:
 SequentialCommandGroup(Command... commands)
 ParallelCommandGroup(Command... commands)
 ParallelRaceGroup(Command... commands)
-ParallelDictatorGroup(Command... commands)
+ParallelDictatorGroup(Command dictator, Command... commands)
 ```
 The first two are self-explanatory.  
 
