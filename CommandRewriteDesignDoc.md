@@ -70,7 +70,9 @@ default boolean isFinished() { return true; }
 default boolean runsWhenDisabled() { return false; }
 ```
 
-These work exactly as before, with the exception of `end()`, which has been modified to fill the roll of both `end()` and `interrupted()` in the previous library (the method param indicates whether the command finished normally, or was interrupted).  They are defaulted for convenience, so that overriding is not necessary if one does not wish to use one of them.  The only difference is that to specify run-when-disabled behavior, one must now override the `runsWhenDisabled()` method instead of calling a `setRunsWhenDisabled()` method (which is not feasible, as `Command` is no longer stateful).
+These work exactly as before, with the exception of `end()`, which has been modified to fill the roll of both `end()` and `interrupted()` in the previous library (the method param indicates whether the command finished normally, or was interrupted).  For the rest of the document, when we say a command is "interrupted," this means `end(true)` is called; when we say "finished," we mean `end(false)` is called.
+
+The methods are defaulted for convenience, so that overriding is not necessary if one does not wish to use one of them.  The only difference is that to specify run-when-disabled behavior, one must now override the `runsWhenDisabled()` method instead of calling a `setRunsWhenDisabled()` method (which is not feasible, as `Command` is no longer stateful).
 
 ##### Handling requirements
 
@@ -158,9 +160,9 @@ ParallelDictatorGroup(Command dictator, Command... commands)
 ```
 The first two are self-explanatory.  
 
-`ParallelRaceGeoup` is a parallel command group that terminates when *any one* of the included commands ends.  All other commands are interrupted at that point.
+`ParallelRaceGeoup` is a parallel command group that terminates when *any one* of the included commands finishes.  All other commands are interrupted at that point.
 
-`ParallelDictatorGroup` is a parallel command group that terminates when a specified one of the included commands (the "dictator") ends.  All other commands that are still running at that point are interrupted.
+`ParallelDictatorGroup` is a parallel command group that terminates when a specified one of the included commands (the "dictator") finishes.  All other commands that are still running at that point are interrupted.
 
 As in the previous library, all command groups require the union of the requirements of their components.  This may seem cumbersome, but teams that wish to circumvent it are free to neglect to declare requirements, or else use `ScheduleCommand` to fork off independently from a command group.  For most use-cases, this is the most-intuitive behavior, as requirements are only checked upon the initial scheduling of a command, and it is by far the easiest to implement and to maintain.
 
@@ -206,7 +208,7 @@ void cancelCommand(Command... commands);
 void cancelAll();
 ```
 
-Forceably ends the given commands, if they are currently scheduled.  The commands will have their `interrupt()` methods called, rather than their `end()` methods.  Note that a command can be cancelled ever if it is not scheduled as `interruptible` - the `interruptible` tag *only* determines if the command can be interrupted by *another command* through its requirements.
+Forceably ends the given commands, if they are currently scheduled.  The commands will have `end(true)` called, rather than `end(false)` methods.  Note that a command can be cancelled ever if it is not scheduled as `interruptible` - the `interruptible` tag *only* determines if the command can be interrupted by *another command* through its requirements.
 
 ##### Querying command state
 
@@ -225,10 +227,10 @@ These methods are fairly self-explanatory, and provide ways for the user to get 
 void onCommandInitialize(Consumer<Command> action);
 void onCommandExecute(Consumer<Command> action);
 void onCommandInterrupt(Consumer<Command> action);
-void onCommandEnd(Consumer<Command> action);
+void onCommandFinish(Consumer<Command> action);
 ````
 
-These provide a simple way to add a task for the scheduler to perform whenever a command is initialized, executed, interrupted, or ended.  For example, one could insert a logging call to mark the event.
+These provide a simple way to add a task for the scheduler to perform whenever a command is initialized, executed, interrupted, or finished normally.  For example, one could insert a logging call to mark the event.
 
 #### Sendable base classes
 
@@ -268,7 +270,7 @@ All `Trigger` and `Button` classes have had an `interruptible` boolean added to 
 
 ##### whileActiveOnce vs whileActiveContinuous
 
-The `whileActive()` method previously re-scheduled the command continuously while the trigger was active.  This has now been named `whileActiveContinuous()`, and a `whileActiveOnce()` method has been added that cancels the command when the trigger becomes inactive, but does not re-start it if it ends normally while the trigger is still active.  The corresponding `Button` method names are `whileHeld()` and `whenHeld()`.
+The `whileActive()` method previously re-scheduled the command continuously while the trigger was active.  This has now been named `whileActiveContinuous()`, and a `whileActiveOnce()` method has been added that cancels the command when the trigger becomes inactive, but does not re-start it if it finishes while the trigger is still active.  The corresponding `Button` method names are `whileHeld()` and `whenHeld()`.
 
 ##### Runnable bindings
 
