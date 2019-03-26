@@ -104,8 +104,8 @@ default Command interruptOn(BooleanSupplier condition)
 default Command whenFinished(Runnable toRun)
 default Command beforeStarting(Runnable toRun)
 default Command andThen(Command... next)
+default Command dictating(Command... parallel)
 default Command alongWith(Command... parallel)
-default Command asWellAs(Command... parallel)
 default Command raceWith(Command... parallel)
 ```
 
