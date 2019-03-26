@@ -158,7 +158,7 @@ ParallelDictatorGroup(Command dictator, Command... commands)
 ```
 The first two are self-explanatory.  
 
-`ParallelRaceGeoup` is a parallel command group that terminates when the *first* of the included commands ends.  All other commands are interrupted at that point.
+`ParallelRaceGeoup` is a parallel command group that terminates when *any one* of the included commands ends.  All other commands are interrupted at that point.
 
 `ParallelDictatorGroup` is a parallel command group that terminates when a specified one of the included commands (the "dictator") ends.  All other commands that are still running at that point are interrupted.
 
