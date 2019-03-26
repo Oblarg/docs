@@ -164,7 +164,7 @@ The first two are self-explanatory.
 
 As in the previous library, all command groups require the union of the requirements of their components.  This may seem cumbersome, but teams that wish to circumvent it are free to neglect to declare requirements, or else use `ScheduleCommand` to fork off independently from a command group.  For most use-cases, this is the most-intuitive behavior, as requirements are only checked upon the initial scheduling of a command, and it is by far the easiest to implement and to maintain.
 
-Also as in the previous library, commands may not belong to more than one `CommandGroup`, and may not be independently scheduled if they are part of a `CommandGroup`.  This prevents inconsistent internal `Command` state.  This is accomplished by means of a weak static list of "allocated" `Command`s in the `CommandGroupBase` class.  Static methods are available for users to clear `Command`s from this list, if desired, but it is strongly warned against in the documentation as there are only a couple of legitimate use-cases for it.
+Also as in the previous library, command instances may not belong to more than one `CommandGroup`, and may not be independently scheduled if they are part of a `CommandGroup`.  This prevents inconsistent internal `Command` state.  This is accomplished by means of a weak static list of "allocated" `Command`s in the `CommandGroupBase` class.  Static methods are available for users to clear `Command`s from this list, if desired, but it is strongly warned against in the documentation as there are only a couple of legitimate use-cases for it.
 
 #### CommandScheduler
 
