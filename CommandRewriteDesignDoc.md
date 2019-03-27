@@ -49,7 +49,7 @@ The rewritten Command-based framework seeks to rectify the above problems.  A br
 
 1.  `Command` and `Subsystem` have been refactored to be interfaces instead of abstract classes.  This places much less imposition on user code, and also prevents scheduling responsibilities from leaking into them.  `Subsystem` is no longer required to have any knowledge of its default `Command`.
 2.  `Scheduler` (now named `CommandScheduler`) is solely responsible for the scheduling of commands (except as occurs through composition) and the handling of requirements.  All relevant scheduling state lives only in scheduler (as `Command` and `Subsystem` are now interfaces, and thus no no longer stateful), though some is further encapsulated in private `CommandState` objects.
-3.  `CommandGroup` has been split into several more-basic classes: `SequentialCommandGroup`, `ParallelCommandGroup`, `ParallelRaceGroup`, and `ParallelDictatorGroup`.  These classes implement the `Command` interface, and are thus composeable - the resulting composition-based API is both more-powerful and much cleaner than the previous `CommandGroup` class.
+3.  `CommandGroup` has been split into several more-basic classes: `SequentialCommandGroup`, `ParallelCommandGroup`, `ParallelRaceGroup`, and `ParallelDeadlineGroup`.  These classes implement the `Command` interface, and are thus composeable - the resulting composition-based API is both more-powerful and much cleaner than the previous `CommandGroup` class.
 4.  To facilitate composition of commands, `Command` has been given a large number of defaulted "decorator" methods which wrap the command with a decorated functionality, usually by means of one of the existing `CommandGroup` classes.
 5.  A large number of useable-out-of-the-box, lambda-based `Command` classes have been included.  In conjuction with the decorator methods mentioned above, these allow teams a simple, concise way to define powerful robot behaviors without writing any new classes.
 6.  `Sendable` implementations have been moved into abstract base classes, which are used as a base for the provided `Command` implementations and `CommandGroup` classes.  These are purely provided for user convenience, and users may disregard them and roll their own `Sendable` functionality if desired (though it is not really possible to decouple this from our pre-made `Command` implementations).
@@ -104,13 +104,13 @@ default Command interruptOn(BooleanSupplier condition)
 default Command whenFinished(Runnable toRun)
 default Command beforeStarting(Runnable toRun)
 default Command andThen(Command... next)
-default Command dictating(Command... parallel)
+default Command deadlineWith(Command... parallel)
 default Command alongWith(Command... parallel)
 default Command raceWith(Command... parallel)
 default Command perpetually()
 ```
 
-These methods compose the given command within a CommandGroup for added functionality.  They are extremely concise and powerful, and pretty self-explanatory.  The three parallel methods correspond with `ParallelDictatorGroup`, `ParallelCommandGroup`, and `ParallelRaceGroup`, respectively.  With these, one can create quite-substantial structures in only a small bit of code:
+These methods compose the given command within a CommandGroup for added functionality.  They are extremely concise and powerful, and pretty self-explanatory.  The three parallel methods correspond with `ParallelDeadlineGroup`, `ParallelCommandGroup`, and `ParallelRaceGroup`, respectively.  With these, one can create quite-substantial structures in only a small bit of code:
 
 ```java
 button.whenPressed(foo.raceWith(bar.andThen(baz.withTimeout(5))));
@@ -157,13 +157,13 @@ There are four basic types of Command groups:
 SequentialCommandGroup(Command... commands)
 ParallelCommandGroup(Command... commands)
 ParallelRaceGroup(Command... commands)
-ParallelDictatorGroup(Command dictator, Command... commands)
+ParallelDeadlineGroup(Command deadline, Command... commands)
 ```
 The first two are self-explanatory.  
 
 `ParallelRaceGeoup` is a parallel command group that terminates when *any one* of the included commands finishes.  All other commands are interrupted at that point.
 
-`ParallelDictatorGroup` is a parallel command group that terminates when a specified one of the included commands (the "dictator") finishes.  All other commands that are still running at that point are interrupted.
+`ParallelDeadlineGroup` is a parallel command group that terminates when a specified one of the included commands (the "deadline") finishes.  All other commands that are still running at that point are interrupted.
 
 As in the previous library, all command groups require the union of the requirements of their components.  This may seem cumbersome, but teams that wish to circumvent it are free to neglect to declare requirements, or else use `ScheduleCommand` to fork off independently from a command group.  For most use-cases, this is the most-intuitive behavior, as requirements are only checked upon the initial scheduling of a command, and it is by far the easiest to implement and to maintain.
 
