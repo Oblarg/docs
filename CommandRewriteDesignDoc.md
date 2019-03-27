@@ -15,7 +15,7 @@ The problems with the current command framework fall generally into three major 
 1.  Poor readability/maintainability.
 2.  Poor encapsulation/separation of responsibilities.
 3.  Unnecessarily restrictive API design.
-4.  Clutter
+4.  Clutter.
 
 These three problems are interrelated, but I will summarize each in turn.
 
