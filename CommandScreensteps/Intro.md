@@ -20,7 +20,6 @@ if(button.get()) {
     intake.run();
     pressed = true;
   } else {
-    intake.stop();
     pressed = false;
 }
 ```
