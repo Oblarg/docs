@@ -12,7 +12,7 @@ The command-based paradigm is an example of what is known as *declarative* progr
 aButton.whenPressed(runIntake);
 ```
 
-In contrast, in and ordinary *imperative* program, the user would need to check the button state every iteration, and perform the appropriate action based on the state of the button.
+In contrast, in an ordinary *imperative* program, the user would need to check the button state every iteration, and perform the appropriate action based on the state of the button.
 
 ```java
 if(button.get()) {
