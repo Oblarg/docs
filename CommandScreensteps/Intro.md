@@ -40,6 +40,8 @@ Commands are run by the `CommandScheduler`, a singleton class that is at the cor
 
 Multiple commands can run concurrently, as long as they do not require the same resources on the robot.  Resource management is declared via the `getRequirements` method of the `Command` interface - commands use this method to specify which subsystems they interact with.  The scheduler will never  schedule more than one method at a time that requires a given subsystem.  this ensures that, for example, users will not end up with two different pieces of code attempting to set the same motor controller to different output values.  If a new command is scheduled that requires a subsystem that is already in use, it will either interrupt the currently-running command that requires that subsystem (if the command has been scheduled as interruptible), or else it will not be scheduled.
 
+Subsystems also can be associated with "default commands" that will be automatically scheduled when no other command is currently using the subsystem.  This is useful for continuous "background" actions such as controlling the robot drive, or keeping an arm held at a setpoint.
+
 TODO: replace this graphic with one that isn't wrong
 
 ![scheduler control flow diagram](https://media.screensteps.com/images/Wpilib/241892/1/rendered/10c3a71e-3789-4c88-b60d-4bb11c517109.png?AWSAccessKeyId=AKIAJRW37ULKKSXWY73Q&Expires=1554406576&Signature=sOHzcI9Pdeh48SQImzwE6ORrE%2Fc%3D)
