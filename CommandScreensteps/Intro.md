@@ -73,7 +73,7 @@ public class ExampleSubsystem implements Subsystem {
 }
 ```
 
-While this is an entirely reasonable and correct way to create a subsystem, it has a few minor drawbacks: in particular, subsystems must call their `register()` method to register themselves with the scheduler in order for their periodic methods to be called when the scheduler runs (otherwise, the scheduler has no way of knowing that they are there!).  Additionally, users may want to leverage the ability to log their subsystem's current status on the robot dashboard, which is not supported by the baseline `Subsystem` interface.  To address this, new users are encouraged to instead subclass the abstract `SendableSubsystemBase` class, which implements the `Subsystem` interface and automatically registers the subsystem with the scheduler upon construction, as well as implementing the `Sendable` interface so that it can be sent to the robot dashboard:
+Notice that all methods in `Subsystem` are defaulted, so the user is not *required* to override anything.  While this is an entirely reasonable and correct way to create a subsystem, it has a few minor drawbacks: in particular, subsystems must call their `register()` method to register themselves with the scheduler in order for their periodic methods to be called when the scheduler runs (otherwise, the scheduler has no way of knowing that they are there!).  Additionally, users may want to leverage the ability to log their subsystem's current status on the robot dashboard, which is not supported by the baseline `Subsystem` interface.  To address this, new users are encouraged to instead subclass the abstract `SendableSubsystemBase` class, which implements the `Subsystem` interface and automatically registers the subsystem with the scheduler upon construction, as well as implementing the `Sendable` interface so that it can be sent to the robot dashboard:
 
 ```java
 import edu.wpi.first.wpilibj.experimental.command.SendableSubsystemBase;
@@ -121,3 +121,127 @@ public class HatchSubsystem extends SendableSubsystemBase {
 ```
 
 Notice that the subsystem hides the presence of the DoubleSolenoid from outside code (it is declared `private`), and instead publicly exposes two higher-level, descriptive robot actions: `grabHatch()` and `releaseHatch()`.  It is extremely important that "implementation details" such as the double solenoid be "hidden" in this manner; this ensures that code outside the subsystem will never cause the solenoid to be in an unexpected state.  It also allows the user to change the implementation (for instance, a motor could be used instead of a pneumatic) without any of the code outside of the subsystem having to change with it.
+
+## Setting default commands
+
+Setting a default command for a subsystem is very easy; one simply calls `Scheduler.getInstance().setDefaultCommand()`, or, more simply,  the `setDefaultCommand()` method of the `Subsystem` interface:
+
+```java
+Scheduler.getInstance().setDefaultCommand(driveSubsystem, defaultDriveCommand);
+```
+
+```java
+driveSubsystem.setDefaultCommand(defaultDriveCommand);
+```
+
+# Commands
+
+Commands are simple state machines that perform high-level robot functions with the methods defined by subsystems.  The `CommandScheduler` recognizes commands as being in one of three states: initializing, executing, or ending.  Commands specify what is done in each of these states through the `initialize()`, `execute()` and `end()` methods.
+
+## Creating commands
+
+As with subsystems, to create a command, a user only needs to make a class implementing the `Command` interface:
+
+```java
+import java.util.Collections;
+
+import edu.wpi.first.wpilibj.experimental.command.Command;
+
+public class ExampleCommand implements Command {
+  // Your command code goes here!
+  
+  // Must be overridden!
+  @override
+  public List<Subsystem> getRequirements() {
+    // What to do if you have no subsystem to require
+    return Collections.emptySet();
+  }
+}
+```
+
+Again, as with subsystems, this is a perfectly fine way to create a command.  However, it is also slightly inconvenient.  Users are forced to override the `getRequirements()` method to declare subsystem requirements, which is cumbersome, and also as with subsystems users may wish to leverage the ability to send their commands to the dashboard (this provides a handy way to schedule commands for testing, as they can then be started from the dashboard).  It is therefore recommended that new users instead create commands by subclassing the abstract `SendableCommandBase` class:
+
+```java
+import edu.wpi.first.wpilibj.experimental.command.SendableCommandBase;
+
+public class ExampleCommand extends SendableCommandBase {
+  // Your command code goes here!
+}
+```
+
+Requirements can then be declared simply by calling the `addRequirements()` method.
+
+## Simple command example
+
+What might a functional command look like in practice?  As before, below is a simple command from the HatchBot example project that uses the `HatchSubsystem` introduced in the previous section:
+
+```java
+package edu.wpi.first.wpilibj.examples.hatchbottraditional.commands;
+
+import edu.wpi.first.wpilibj.examples.hatchbottraditional.subsystems.HatchSubsystem;
+import edu.wpi.first.wpilibj.experimental.command.SendableCommandBase;
+
+/**
+ * A simple command that grabs a hatch with the {@link HatchSubsystem}.  Written explicitly for 
+ * pedagogical purposes.
+ */
+public class GrabHatchExplicit extends SendableCommandBase {
+  
+  // The subsystem the command runs on
+  private final HatchSubsystem m_hatchSubsystem;
+  
+  public GrabHatchExplicit(HatchSubsystem subsystem) {
+    m_hatchSubsystem = subsystem;
+  }
+
+  @Override
+  public void initialize() {
+    m_hatchSubsystem.grabHatch();
+  }
+
+  @Override
+  public boolean isFinished() {
+    return true;
+  }
+}
+```
+
+Notice that the hatch subsystem used by the command is passed into the command through the command's constructor.  This is a pattern called [dependency injection](https://en.wikipedia.org/wiki/Dependency_injection), and allows users to avoid declaring their subsystems as global variables.  This is widely accepted as a best-practice - the reasoning behind this will be discussed in a later section (TODO: link to the section once it's written).
+
+Notice also that the above command calls the subsystem method once from initialize, and then immediately ends (as `isFinished()` simply returns true).  This is typical for commands that toggle the states of subsystems, and in fact the command-based library includes code to make commands like this even more succinctly (TODO: link to section on this).
+
+What about a more complicated case?  Below is a drive command, from the same example project:
+
+```java
+package edu.wpi.first.wpilibj.examples.hatchbottraditional.commands;
+
+import java.util.function.DoubleSupplier;
+
+import edu.wpi.first.wpilibj.examples.hatchbottraditional.subsystems.DriveSubsystem;
+import edu.wpi.first.wpilibj.experimental.command.SendableCommandBase;
+
+/**
+ * A command to drive the robot with joystick input (passed in as {@link DoubleSupplier}s).
+ * Written explicitly for pedagogical purposes - actual code should inline a command this simple
+ * with {@link edu.wpi.first.wpilibj.experimental.command.RunCommand}.
+ */
+public class DefaultDrive extends SendableCommandBase {
+
+  private final DriveSubsystem m_drive;
+  private final DoubleSupplier m_forward;
+  private final DoubleSupplier m_rotation;
+
+  public DefaultDrive(DriveSubsystem subsystem, DoubleSupplier forward, DoubleSupplier rotation){
+    m_drive = subsystem;
+    m_forward = forward;
+    m_rotation = rotation;
+  }
+
+  @Override
+  public void execute() {
+    m_drive.arcadeDrive(m_forward.getAsDouble(), m_rotation.getAsDouble());
+  }
+}
+```
+
+Notice that this command does not override `isFinished()`, and thus will never end; this is the norm for commands that are intended to be used as default commands (and, as can be guessed, the library includes tools to make this kind of command easier to write, too!) (TODO: add link to relevant section).
