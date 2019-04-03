@@ -30,4 +30,6 @@ if(aButton.get()) {
 
 The command-based pattern is based around two core abstractions: **commands**, and **subsystems.**
 
-**Subsystems** are the basic unit of robot organization in the design-based paradigm.  Subsystems [encapsulate](https://en.wikipedia.org/wiki/Encapsulation_(computer_programming)) lower-level robot hardware (such as motor controllers, sensors, and/or pneumatic actuators), and define the interfaces through which that hardware can be accessed by the rest of the robot code.  Subsystems allow users to "hide" the internal complexity of their actual hardware from the rest of their code
+**Subsystems** are the basic unit of robot organization in the design-based paradigm.  Subsystems [encapsulate](https://en.wikipedia.org/wiki/Encapsulation_(computer_programming)) lower-level robot hardware (such as motor controllers, sensors, and/or pneumatic actuators), and define the interfaces through which that hardware can be accessed by the rest of the robot code.  Subsystems allow users to "hide" the internal complexity of their actual hardware from the rest of their code - this both simplifies the rest of the robot code, and allows the internal details of a subsystem to be changed without also changing the rest of the robot code.  Subsystems implement the `Subsystem` interface.
+
+**Commands** define high-level robot actions or behaviors that utilize the methods defined by the subsystems.
