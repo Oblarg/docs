@@ -9,7 +9,7 @@ WPILib supports a robot programming methodology called "command-based" programmi
 The command-based paradigm is an example of what is known as *declarative* programming.  In declarative programming, the emphasis is placed on *what* the program ought to do, rather than *how* the program ought to do it.  Thus, the command-based libraries allow users to define desired robot behaviors while minimizing the amount of iteration-by-iteration robot logic that they must write.  For example, in a command-based program, a user can specify that "the robot should perform an action when a button is pressed":
 
 ```java
-aButton.whenPressed(intake::run);
+aButton.whenPressed(runIntake);
 ```
 
 In contrast, in and ordinary *imperative* program, the user would need to check the button state every iteration, and perform the appropriate action based on the state of the button.
@@ -20,6 +20,7 @@ if(button.get()) {
     intake.run();
     pressed = true;
   } else {
-    prssed = false;
+    intake.stop();
+    pressed = false;
 }
 ```
