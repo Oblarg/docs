@@ -39,7 +39,7 @@ The command-based pattern is based around two core abstractions: **commands**, a
 
 Commands are run by the `CommandScheduler`, a singleton class that is at the core of the command-based library.  The `CommandScheduler` is in charge of polling buttons for new commands to schedule, checking the resources required by those commands to avoid conflicts, executing currently-scheduled commands, and removing commands that have finished or been interrupted.  The scheduler's `run()` method may be called from any place in the user's code; it is generally recommended to call it from the `robotPeriodic()` method of the `Robot` class, which is run at a default frequency of 50Hz (once every 20ms).
 
-Multiple commands can run concurrently, as long as they do not require the same resources on the robot.  Resource management is declared via the `getRequirements` method of the `Command` interface - commands use this method to specify which subsystems they interact with.  The scheduler will never  schedule more than one method at a time that requires a given subsystem.  this ensures that, for example, users will not end up with two different pieces of code attempting to set the same motor controller to different output values.  If a new command is scheduled that requires a subsystem that is already in use, it will either interrupt the currently-running command that requires that subsystem (if the command has been scheduled as interruptible), or else it will not be scheduled.
+Multiple commands can run concurrently, as long as they do not require the same resources on the robot.  Resource management is handled on a per-subsystem basis: commands may specify which subsystems they interact with, and the scheduler will never schedule more than one method at a time that requires a given subsystem.  this ensures that, for example, users will not end up with two different pieces of code attempting to set the same motor controller to different output values.  If a new command is scheduled that requires a subsystem that is already in use, it will either interrupt the currently-running command that requires that subsystem (if the command has been scheduled as interruptible), or else it will not be scheduled.
 
 Subsystems also can be associated with "default commands" that will be automatically scheduled when no other command is currently using the subsystem.  This is useful for continuous "background" actions such as controlling the robot drive, or keeping an arm held at a setpoint.
 
@@ -52,3 +52,73 @@ When a command is scheduled, its `initialize()` method is called once.  Its `exe
 ## Command groups
 
 It is often desirable to build complex commands from simple pieces.  This is achievable by [composing](https://en.wikipedia.org/wiki/Object_composition) commands into "command groups."  A command group is a command that contains multiple commands within it, which run either in parallel or in sequence.  The command-based library provides several types of command groups for teams to use, and users are encouraged to write their own, if desired.  As command groups themselves implement the `Command` interface, they are [recursively composeable](https://en.wikipedia.org/wiki/Object_composition#Recursive_composition) - one can include command groups *within* other command groups.  This provides an extremely powerful way of building complex robot actions with a simple library.
+
+# Subsystems
+
+Subsystems are the basic unit of robot organization in the command-based paradigm.  A subsystem is an abstraction for a collection of robot hardware that *operates together as a unit*.  Subsystems [encapsulate] (https://en.wikipedia.org/wiki/Encapsulation_(computer_programming)) this hardware, "hiding" it from the rest of the robot code (e.g. commands) and restricting access to it except through the subsystem's public methods. Restricting the access in this way provides a single convenient place for code that might otherwise be duplicated in multiple places (such as scaling motor outputs or checking limit switches) if the subsystem internals were exposed.  It also allows changes to the specific details of how the subsystem works (the "implementation") to be isolated from the rest of robot code, making it far easier to make substantial changes if/when the design constraints change.
+
+Subsystems also serve as the backbone of the `CommandScheduler`'s resource management system.  Commands may declare resource requirements by specifying which subsystems they interact with; the scheduler will never concurrently schedule more than one command that requires a given subsystem.  An attempt to schedule a command that requires a subsystem that is already-in-use will either interrupt the currently-running command (if the command has been scheduled as interruptible), or else be ignored.
+
+Subsystems can be associated with "default commands" that will be automatically scheduled when no other command is currently using the subsystem.  This is useful for continuous "background" actions such as controlling the robot drive, or keeping an arm held at a setpoint.  Similar functionality can be achieved in the subsystem's `periodic()` method, which is run once per run of the scheduler; teams should try to be consistent within their codebase about which functionality is achieved through either of these methods.
+
+## Creating a subsystem
+
+All that is needed to create a subsystem is to create a class that implements the `Subsystem` interface:
+
+```java
+import edu.wpi.first.wpilibj.experimental.command.Subsystem;
+
+public class ExampleSubsystem implements Subsystem {
+  // Your subsystem code goes here!
+}
+```
+
+While this is an entirely reasonable and correct way to create a subsystem, it has a few minor drawbacks: in particular, subsystems must call their `register()` method to register themselves with the scheduler in order for their periodic methods to be called when the scheduler runs (otherwise, the scheduler has no way of knowing that they are there!).  Additionally, users may want to leverage the ability to log their subsystem's current status on the robot dashboard, which is not supported by the baseline `Subsystem` interface.  To address this, new users are encouraged to instead subclass the abstract `SendableSubsystemBase` class, which implements the `Subsystem` interface and automatically registers the subsystem with the scheduler upon construction, as well as implementing the `Sendable` interface so that it can be sent to the robot dashboard:
+
+```java
+import edu.wpi.first.wpilibj.experimental.command.SendableSubsystemBase;
+
+public class ExampleSubsystem extends SendableSubsystemBase {
+  // Your subsystem code goes here!
+}
+```
+
+## Simple subsystem example
+
+What might a functional subsystem look like in practice?  Below is a simple pneumatically-actuated hatch mechanism from the HatchBot example project:
+
+```java
+package edu.wpi.first.wpilibj.examples.hatchbottraditional.subsystems;
+
+import edu.wpi.first.wpilibj.DoubleSolenoid;
+import edu.wpi.first.wpilibj.experimental.command.SendableSubsystemBase;
+
+import static edu.wpi.first.wpilibj.DoubleSolenoid.Value.kForward;
+import static edu.wpi.first.wpilibj.DoubleSolenoid.Value.kReverse;
+import static edu.wpi.first.wpilibj.examples.hatchbottraditional.Constants.HatchConstants.*;
+
+/**
+ * A hatch mechanism actuated by a single {@link DoubleSolenoid}.
+ */
+public class HatchSubsystem extends SendableSubsystemBase {
+
+  private final DoubleSolenoid m_hatchSolenoid =
+      new DoubleSolenoid(kHatchSolenoidModule, kHatchSolenoidPorts[0], kHatchSolenoidPorts[1]);
+
+  /**
+   * Grabs the hatch.
+   */
+  public void grabHatch() {
+    m_hatchSolenoid.set(kForward);
+  }
+
+  /**
+   * Releases the hatch.
+   */
+  public void releaseHatch() {
+    m_hatchSolenoid.set(kReverse);
+  }
+}
+```
+
+Notice that the subsystem hides the presence of the DoubleSolenoid from outside code (it is declared `private`), and instead publicly exposes two higher-level, descriptive robot actions: `grabHatch()` and `releaseHatch()`.  It is extremely important that "implementation details" such as the double solenoid be "hidden" in this manner; this ensures that code outside the subsystem will never cause the solenoid to be in an unexpected state.  It also allows the user to change the implementation (for instance, a motor could be used instead of a pneumatic) without any of the code outside of the subsystem having to change with it.
