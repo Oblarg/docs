@@ -21,6 +21,7 @@ if(aButton.get()) {
     pressed = true;
   } else {
     pressed = false;
+  }
 }
 ```
 
