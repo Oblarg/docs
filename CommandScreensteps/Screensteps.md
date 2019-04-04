@@ -244,12 +244,12 @@ import edu.wpi.first.wpilibj.experimental.command.SendableCommandBase;
  * pedagogical purposes; actual code should inline a command this simple with 
  * {@link edu.wpi.first.wpilibj.experimental.command.InstantCommand}.
  */
-public class GrabHatchExplicit extends SendableCommandBase {
+public class GrabHatch extends SendableCommandBase {
   
   // The subsystem the command runs on
   private final HatchSubsystem m_hatchSubsystem;
   
-  public GrabHatchExplicit(HatchSubsystem subsystem) {
+  public GrabHatch(HatchSubsystem subsystem) {
     m_hatchSubsystem = subsystem;
     addRequirements(m_hatchSubsystem);
   }
