@@ -85,7 +85,7 @@ public class ExampleSubsystem extends SendableSubsystemBase {
 
 ## Simple subsystem example
 
-What might a functional subsystem look like in practice?  Below is a simple pneumatically-actuated hatch mechanism from the HatchBot example project:
+What might a functional subsystem look like in practice?  Below is a simple pneumatically-actuated hatch mechanism from the HatchBot example project (TODO: link to it):
 
 ```java
 package edu.wpi.first.wpilibj.examples.hatchbottraditional.subsystems;
