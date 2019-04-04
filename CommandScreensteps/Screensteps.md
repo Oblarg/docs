@@ -136,7 +136,7 @@ driveSubsystem.setDefaultCommand(defaultDriveCommand);
 
 # Commands
 
-Commands are simple state machines that perform high-level robot functions with the methods defined by subsystems.  The `CommandScheduler` recognizes scheduled commands as being in one of three states: initializing, executing, or ending.  Commands specify what is done in each of these states through the `initialize()`, `execute()` and `end()` methods.
+Commands are simple state machines that perform high-level robot functions with the methods defined by subsystems.  Commands can be either idle, in which they do nothing, or scheduled, in which the scheduler will execute a specific set of the command's code depending on the state of the command.  The `CommandScheduler` recognizes scheduled commands as being in one of three states: initializing, executing, or ending.  Commands specify what is done in each of these states through the `initialize()`, `execute()` and `end()` methods.
 
 ## Creating commands
 
@@ -194,7 +194,8 @@ public void execute() {
   // Code here will be executed every time the scheduler runs while the command is scheduled!
 }
 ```
-The `execute()` method is run repeatedly while the command is scheduled, whenever the scheduler's `run()` method is called (this is generally done in the main robot periodic method, which runs every 20ms by default).  The execute block should be used for any task that needs to be done continually while the command is scheduled, such as updating motor outputs to match joystick inputs, or using the ouput of a control loop.
+
+The `execute()` method is called repeatedly while the command is scheduled, whenever the scheduler's `run()` method is called (this is generally done in the main robot periodic method, which runs every 20ms by default).  The execute block should be used for any task that needs to be done continually while the command is scheduled, such as updating motor outputs to match joystick inputs, or using the ouput of a control loop.
 
 ### Ending
 
@@ -203,11 +204,26 @@ The `execute()` method is run repeatedly while the command is scheduled, wheneve
 public void end(boolean interrupted) {
   // Code here will be executed whenever the command ends, whether it finishes normally or is interrupted!
   if (interrupted) {
-    // Using the argument of the method allows users to do different actions depending on whether the command finished normally or was interrupted!
+    // Using the argument of the method allows users to do different actions depending on whether the command 
+    // finished normally or was interrupted!
   }
 }
 ```
 
+The `end()` method of the command is called once when the command ends, whether it finishes normally (i.e. `isFinished()` returned true) or it was interrupted (either by another command or by being explicitly canceled).  The method argument specifies the manner in which the command ended; users can use this to differentiate the behavior of their command end accordingly.  The end block should be used to "wrap up" command state in a neat way, such as setting motors back to zero or reverting a solenoid actuator to a "default" state.
+
+### Specifying end conditions
+
+```java
+@override
+public boolean isFinished() {
+  // This return value will specify whether the command has finished!  The default is "false," which will make the
+  // command never end.
+  return false;
+}
+```
+
+Just like `execute()`, the `isFinished()` method of the command is called repeatedly, whenever the scheduler's `run()` method is called.  As soon as it returns true, the command's `end()` method is called and it is un-scheduled.  The `isFinished()` method is called *after* the `execute()` method, so the command *will* execute once on the same iteration that it is un-scheduled.
 
 ## Simple command example
 
