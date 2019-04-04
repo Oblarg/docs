@@ -136,7 +136,7 @@ driveSubsystem.setDefaultCommand(defaultDriveCommand);
 
 # Commands
 
-Commands are simple state machines that perform high-level robot functions with the methods defined by subsystems.  The `CommandScheduler` recognizes commands as being in one of three states: initializing, executing, or ending.  Commands specify what is done in each of these states through the `initialize()`, `execute()` and `end()` methods.
+Commands are simple state machines that perform high-level robot functions with the methods defined by subsystems.  The `CommandScheduler` recognizes scheduled commands as being in one of three states: initializing, executing, or ending.  Commands specify what is done in each of these states through the `initialize()`, `execute()` and `end()` methods.
 
 ## Creating commands
 
@@ -170,6 +170,44 @@ public class ExampleCommand extends SendableCommandBase {
 ```
 
 Requirements can then be declared simply by calling the `addRequirements()` method.
+
+## The structure of a command
+
+While subsystems are fairly freeform, and may generally look like whatever the user wishes them to, commands are quite a bit more constrained.  Command code must specify what the command will do in each of its possible states.  This is done by overriding the `initialize()`, `execute()`, and `end()` methods.  Additionally, a command must be able to tell the scheduler when (if ever) it has finished execution - this is done by overriding the `isFinished()` method.  All of these methods are defaulted to reduce clutter in user code: `initialize()`, `execute()`, and `end()` are defaulted to simply do nothing, while `isFinishsed()` is defaulted to return false (resulting in a command that never ends).
+
+### Initialization
+
+```java
+@override
+public void initialize() {
+  // Code here will be executed when a command initializes!
+}
+```
+
+The `initialize()` method is run exactly once per time a command is scheduled, as part of the scheduler's `schedule()` method.  The scheduler's `run()` method does not need to be called for the `initialize()` method to run.  The initialize block should be used to place the command in a known starting state for execution.  It is also useful for performing tasks that only need to be performed once per time scheduled, such as setting motors to run at a constant speed or setting the state of a solenoid actuator.
+
+### Execution
+
+```java
+@override
+public void execute() {
+  // Code here will be executed every time the scheduler runs while the command is scheduled!
+}
+```
+The `execute()` method is run repeatedly while the command is scheduled, whenever the scheduler's `run()` method is called (this is generally done in the main robot periodic method, which runs every 20ms by default).  The execute block should be used for any task that needs to be done continually while the command is scheduled, such as updating motor outputs to match joystick inputs, or using the ouput of a control loop.
+
+### Ending
+
+```java
+@override
+public void end(boolean interrupted) {
+  // Code here will be executed whenever the command ends, whether it finishes normally or is interrupted!
+  if (interrupted) {
+    // Using the argument of the method allows users to do different actions depending on whether the command finished normally or was interrupted!
+  }
+}
+```
+
 
 ## Simple command example
 
