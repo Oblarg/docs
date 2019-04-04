@@ -237,7 +237,8 @@ import edu.wpi.first.wpilibj.experimental.command.SendableCommandBase;
 
 /**
  * A simple command that grabs a hatch with the {@link HatchSubsystem}.  Written explicitly for 
- * pedagogical purposes.
+ * pedagogical purposes; actual code should inline a command this simple with 
+ * {@link edu.wpi.first.wpilibj.experimental.command.InstantCommand}.
  */
 public class GrabHatchExplicit extends SendableCommandBase {
   
