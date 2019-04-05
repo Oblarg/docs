@@ -418,3 +418,19 @@ This creates a sequential command group that *contains* a parallel command group
 ![command group with concurrency](https://media.screensteps.com/images/Wpilib/241892/1/rendered/47DD42D1-0EF3-467A-91E1-26EF7EB92618.png?AWSAccessKeyId=AKIAJRW37ULKKSXWY73Q&Expires=1554575116&Signature=2bxScjmYX6eE%2FIlxhhzHVIrzoUU%3D)
 
 Notice how the recursive composition allows the embedding of a parallel control structure within a sequential one.  Notice also that this entire, more-complex structure, could be again embedded in another structure.  Composition is an extremely powerful tool, and one that users should be sure to use extensively.
+
+## Command groups and requirements
+
+As command groups are commands, they also must declare their requirements.  However, users are not required to specify requirements manually for command groups - requirements are automatically inferred from the commands included.  As a rule, *command groups include the union of all of the subsystems required by their component commands.*  Thus, the `ComplexAuto` shown previously will require both the drive subsystem and the hatch subsystem of the robot.
+
+Additionally, requirements are enforced within all three types of parallel groups - a parallel group may not contain multiple commands that require the same subsystem.
+
+Some advanced users may find this overly-restrictive - for said users, the library offers a `ScheduleCommand` class that can be used to independently "branch off" from command groups to provide finer granularity in requirement management (TODO: link).
+
+## Restrictions on command group components
+
+Since command group components are run through their encapsulating command groups, errors could occur if those same command instances were independently scheduled at the same time as the group - the command would be being run from multiple places at once, and thus could end up with inconsistent internal state, causing unexpected and hard-to-diagnose behavior.
+
+For this reason, command instances that have been added to a command group cannot be independently scheduled or added to a second command group.  Attempting to do so will throw an `InvalidUseOfCommandException`.
+
+Advanced users who wish to re-use a command instance and are *certain* that it is safe to do so may bypass this restriction with the `clearGroupedCommand()` method in the `CommandGroupBase` class (TODO: link).
