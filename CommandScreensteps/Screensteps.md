@@ -665,18 +665,18 @@ And, for an inlined example (TODO: link):
 
 ```java
 // Stabilize robot to drive straight with gyro when left bumper is held
-    driverController.getButton(Button.kBumperLeft.value)
-        .whenHeld(new SynchronousPIDCommand(
-                new PIDController(kStabilizationP, kStabilizationI, kStabilizationD),
-                // Close the loop on the turn rate
-                m_robotDrive::getTurnRate,
-                // Setpoint is 0
-                0,
-                // Pipe the output to the turning controls
-                (output) ->
-                    m_robotDrive.arcadeDrive(driverController.getY(GenericHID.Hand.kLeft), output),
-                // Require the robot drive
-                m_robotDrive
-            )
-        );
+driverController.getButton(Button.kBumperLeft.value)
+    .whenHeld(new SynchronousPIDCommand(
+            new PIDController(kStabilizationP, kStabilizationI, kStabilizationD),
+            // Close the loop on the turn rate
+            m_robotDrive::getTurnRate,
+            // Setpoint is 0
+            0,
+            // Pipe the output to the turning controls
+            (output) ->
+                m_robotDrive.arcadeDrive(driverController.getY(GenericHID.Hand.kLeft), output),
+            // Require the robot drive
+            m_robotDrive
+        )
+    );
 ```
