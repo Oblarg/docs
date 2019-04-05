@@ -435,6 +435,40 @@ For this reason, command instances that have been added to a command group canno
 
 Advanced users who wish to re-use a command instance and are *certain* that it is safe to do so may bypass this restriction with the `clearGroupedCommand()` method in the `CommandGroupBase` class (TODO: link).
 
+# Binding commands to triggers
+
+Apart from autonomous commands, which are scheduled at the start of the autonomous period, and default commands, which are automatically scheduled whenever their subsystem is not currently in-use, the most common way to run a command is by binding it to a triggering event, such as a button being pressed by a human operator.  The command-based paradigm makes this extremely easy to do.
+
+As mentioned earlier, command-based is a [declarative](https://en.wikipedia.org/wiki/Declarative_programming) paradigm.  Accordingly, binding buttons to commands is done declaratively; the association of a button and a command is "declared" once, during robot initialization.  The library then does all the hard work of checking the button state and scheduling (or cancelling) the command as needed, behind-the-scenes.  Users only need to worry about designing their desired UI setup - not about implementing it!
+
+Command binding is done through the `Trigger` class and its subclasses (TODO: link).
+
+## Binding a command to a joystick button
+
+The most-common way to trigger a command is to bind a command to a button on a joystick or other HID (human interface device).  To do this, users should use the `JoystickButton` class.
+
+### Creating a JoystickButton
+
+There are two ways to create a `JoystickButton`.  For both, one must first create an instance of one of the subclasses of `GenericHID`:
+
+```java
+Joystick leftStick = new Joystick(1); // Creates a joystick on port 1
+```
+
+```java
+XboxController driverController = new XboxController(2); // Creates an XboxController on port 2.
+```
+
+After this is done, users can simply call the `getButton()` method on the HID:
+
+```java
+leftStick.getButton(Joystick.Button.kTrigger.value) // Returns the JoystickButton object corresponding to the trigger
+```
+
+```java
+driverController.getButton(XboxController.Button.kX.value) // Returns the JoystickButton object corresponding to the `X` button
+```
+
 # PID control through PIDSubsystems and PIDCommands
 
 One of the most common control algorithms used in FRC is the [PID controller](https://en.wikipedia.org/wiki/PID_controller).  WPILib offers its own `PIDController` class to help teams implement this functionality on their robots (TODO: link).  To further help teams integrate PID control into a command-based robot project, the command-based library includes several convenience wrappers for the `PIDController` object.  There are two basic wrappers: PIDSubsystems, which integrate the PID controller into a subsystem, and PIDCommands, which integrate the PID controller into a command.  Morevoer, each wrapper comes in one of two varieties: synchronous, which run from the main robot loop, and asynchronous, which run in their own thread.  While the asynchronous versions offer more functionality and potentially tigher control, new/inexperienced users are encouraged to use the synchronous versions to avoid having to deal with thread safety issues.
