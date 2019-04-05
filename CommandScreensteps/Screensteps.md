@@ -573,7 +573,7 @@ driverController.getButton(XboxController.Button.kX.value)
 
 Remember that button binding is *declarative*: bindings only need to be declared once, ideally some time during robot initialization.  The library handles everything else.
 
-### Composing triggers
+## Composing triggers
 
 The `Trigger` class (including its `Button` subclasses) can be composed to create composite triggers through the `and()`, `or()`, and `negate()` methods.  For example:
 
@@ -586,7 +586,7 @@ driverController.getButton(XboxController.Button.kX.value)
 
 Note that these methods return a `Trigger`, not a `Button`, so the `Trigger` binding method names must be used even when buttons are composed.
 
-### Creating your own custom trigger
+## Creating your own custom trigger
 
 While binding to HID buttons is by far the most common use case, advanced users may occasionally want to bind commands to arbitrary triggering events.  This can be easily done by simply writing your own subclass of trigger:
 
