@@ -321,27 +321,81 @@ Most importantly, however, command groups *are themselves commands* - they imple
 
 The command-based library supports four basic types of command groups: `SequentialCommandGroup`, `ParallelCommandGroup`, `ParallelRaceGroup`, and `ParallelDeadlineGroup`.  Each of these command groups combines multiple commands into a composite command - however, they do so in different ways:
 
+### SequentialCommandGroup
 ```java
 SequentialCommandGroup(Command... commands)
 ```
 
 A `SequentialCommandGroup` runs a list of commands in sequence - the first command will be executed, then the second, then the third, and so on until the list finishes.  The sequential group finishes after the last command in the sequence finishes.  It is therefore usually important to ensure that each command in the sequence does actually finish (if a given command does not finish, the next command will never start!).
 
+### ParallelCommandGroup
 ```
 ParallelCommandGroup(Command... commands)
 ```
 
 A `ParallelCommandGroup` runs a set of commands concurrently - all commands will execute at the same time.  The parallel group will end when all commands have finished.
 
+### ParallelRaceGroup
 ```
 ParallelRaceGroup(Command... commands)
 ```
 
 A `ParallelRaceGroup` is much like a `ParallelCommandgroup`, in that it runs a set of commands concurrently.  However, the race group ends as soon as any command in the group ends - all other commands are interrupted at that point.
 
+### ParallelDeadlineGroup
 ```
 ParallelDeadlineGroup(Command deadline, Command... commands)
 ```
 
 A `ParallelDeadlineGroup` also runs a set of commands concurrently.  However, the deadline group ends when a *specific* command (the "deadline") ends, interrupting all other commands in the group that are still running at that point.
 
+## Creating command groups
+
+Users have several options for creating command groups.  One way - similar to the previous incarnation of the command-based library - is to subclass one of the command group classes.  Consider the following from the Hatch Bot example project (TODO: link):
+
+```java
+package edu.wpi.first.wpilibj.examples.hatchbottraditional.commands;
+
+import edu.wpi.first.wpilibj.examples.hatchbottraditional.subsystems.DriveSubsystem;
+import edu.wpi.first.wpilibj.examples.hatchbottraditional.subsystems.HatchSubsystem;
+import edu.wpi.first.wpilibj.experimental.command.SequentialCommandGroup;
+
+import static edu.wpi.first.wpilibj.examples.hatchbottraditional.Constants.AutoConstants.*;
+
+/**
+ * A complex auto command that drives forward, releases a hatch, and then drives backward.
+ */
+public class ComplexAuto extends SequentialCommandGroup {
+
+  public ComplexAuto(DriveSubsystem drive, HatchSubsystem hatch) {
+    addCommands(
+        // Drive forward the correct distance
+        new DriveDistance(kAutoDriveDistanceInches, kAutoDriveSpeed, drive),
+
+        // Release the hatch
+        new ReleaseHatch(hatch),
+
+        // Drive backward the specified distance
+        new DriveDistance(kAutoBackupDistanceInches, -kAutoDriveSpeed, drive)
+    );
+  }
+
+}
+```
+
+The `addCommands` method adds commands to the group, and is present in all four types of command group.
+
+Equivalently, however, command groups can be used without subclassing at all: one can simply pass in the desired commands through the constructor.  Thus, the following two pieces of code are equivalent:
+
+```java
+Command complexAuto = new ComplexAuto(m_robotDrive, m_hatchSubsystem);
+```
+
+```java
+Command complexAuto = new SequentialCommandGroup(
+    new DriveDistance(kAutoDriveDistanceInches, kAutoDriveSpeed, m_robotDrive),
+    new ReleaseHatch(m_hatchSubsystem),
+    new DriveDistance(kAutoBackupDistanceInches, -kAutoDriveSpeed, m_robotDrive));
+```
+
+This is called an *inline* command definition (TODO: link to section), and is very handy for circumstances where command groups are not likely to be reused, and writing an entire class for them would be wasteful.
