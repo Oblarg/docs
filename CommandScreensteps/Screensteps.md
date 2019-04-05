@@ -462,11 +462,13 @@ XboxController driverController = new XboxController(2); // Creates an XboxContr
 After this is done, users can simply call the `getButton()` method on the HID:
 
 ```java
-leftStick.getButton(Joystick.Button.kTrigger.value) // Returns the JoystickButton object corresponding to the trigger
+leftStick.getButton(Joystick.Button.kTrigger.value) // Returns the JoystickButton pbject
+                                                    // corresponding to the trigger of leftStick
 ```
 
 ```java
-driverController.getButton(XboxController.Button.kX.value) // Returns the JoystickButton object corresponding to the `X` button
+driverController.getButton(XboxController.Button.kX.value) // Returns the JoystickButton object 
+                                                           // corresponding to the `X` button of driverController
 ```
 
 # PID control through PIDSubsystems and PIDCommands
