@@ -184,7 +184,7 @@ While subsystems are fairly freeform, and may generally look like whatever the u
 ### Initialization
 
 ```java
-@override
+@Override
 public void initialize() {
   // Code here will be executed when a command initializes!
 }
@@ -195,7 +195,7 @@ The `initialize()` method is run exactly once per time a command is scheduled, a
 ### Execution
 
 ```java
-@override
+@Override
 public void execute() {
   // Code here will be executed every time the scheduler runs while the command is scheduled!
 }
@@ -206,7 +206,7 @@ The `execute()` method is called repeatedly while the command is scheduled, when
 ### Ending
 
 ```java
-@override
+@Override
 public void end(boolean interrupted) {
   // Code here will be executed whenever the command ends, whether it finishes normally or is interrupted!
   if (interrupted) {
@@ -221,7 +221,7 @@ The `end()` method of the command is called once when the command ends, whether 
 ### Specifying end conditions
 
 ```java
-@override
+@Override
 public boolean isFinished() {
   // This return value will specify whether the command has finished!  The default is "false," which will make the
   // command never end.
@@ -569,6 +569,35 @@ driverController.getButton(XboxController.Button.kX.value)
     .whenPressed(new FooCommand());
     // Binds a BarCommand to be scheduled when that same button is released
     .whenReleased(new BarCommand());
+```
+
+Remember that button binding is *declarative*: bindings only need to be declared once, ideally some time during robot initialization.  The library handles everything else.
+
+### Composing triggers
+
+The `Trigger` class (including its `Button` subclasses) can be composed to create composite triggers through the `and()`, `or()`, and `negate()` methods.  For example:
+
+```java
+// Binds an ExampleCommand to be scheduled when both the 'X' and 'Y' buttons of the driver gamepad are pressed
+driverController.getButton(XboxController.Button.kX.value)
+    .and(driverController.getButton(XboxController.Button.kY.value))
+    .whenActive(new ExampleCommand());
+```
+
+Note that these methods return a `Trigger`, not a `Button`, so the `Trigger` binding method names must be used even when buttons are composed.
+
+### Creating your own custom trigger
+
+While binding to HID buttons is by far the most common use case, advanced users may occasionally want to bind commands to arbitrary triggering events.  This can be easily done by simply writing your own subclass of trigger:
+
+```java
+public class ExampleTrigger extends Trigger {
+
+  @Override
+  public boolean get() {
+    // This returns whether the trigger is active
+  }
+}
 ```
 
 # PID control through PIDSubsystems and PIDCommands
