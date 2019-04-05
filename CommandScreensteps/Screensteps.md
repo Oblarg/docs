@@ -415,4 +415,4 @@ new SequentialCommandGroup(
 
 This creates a sequential command group that *contains* a parallel command group.  The resulting control flow looks something like this:
 
-![command group with concurrency](https://media.screensteps.com/images/Wpilib/241892/1/rendered/47DD42D1-0EF3-467A-91E1-26EF7EB92618_display.png?AWSAccessKeyId=AKIAJRW37ULKKSXWY73Q&Expires=1554486092&Signature=B0Kx8GHNXc49IgyzuL9LiEp00o8%3D)
+![command group with concurrency](https://media.screensteps.com/images/Wpilib/241892/1/rendered/47DD42D1-0EF3-467A-91E1-26EF7EB92618.png?AWSAccessKeyId=AKIAJRW37ULKKSXWY73Q&Expires=1554575116&Signature=2bxScjmYX6eE%2FIlxhhzHVIrzoUU%3D)
