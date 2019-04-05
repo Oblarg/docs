@@ -309,7 +309,7 @@ public class DefaultDrive extends SendableCommandBase {
 
 Notice that this command does not override `isFinished()`, and thus will never end; this is the norm for commands that are intended to be used as default commands (and, as can be guessed, the library includes tools to make this kind of command easier to write, too!) (TODO: add link to relevant section).
 
-#Command groups
+# Command groups
 
 Individual commands are capable of accomplishing a large variety of robot tasks, but the simple three-state format can quickly become cumbersome when more advanced functionality requiring extended sequences of robot tasks or coordination of multiple robot subsystems is required.  In order to accomplish this, users are encouraged to use the powerful command group functionality included in the command-based library.
 
