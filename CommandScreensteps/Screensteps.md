@@ -406,11 +406,11 @@ As mentioned earlier, command groups are [recursively composeable](https://en.wi
 
 ```java
 new SequentialCommandGroup(
-    new DriveToGoal(),
+    new DriveToGoal(m_drive),
     new ParallelCommandGroup(
-        new RaiseElevator(),
-        new SetWristPosition()),
-    new ScoreTube());
+        new RaiseElevator(m_elevator),
+        new SetWristPosition(m_wrist)),
+    new ScoreTube(m_wrist));
 ```
 
 This creates a sequential command group that *contains* a parallel command group.  The resulting control flow looks something like this:
