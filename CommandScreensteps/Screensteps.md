@@ -63,7 +63,19 @@ Subsystems can be associated with "default commands" that will be automatically 
 
 ## Creating a subsystem
 
-All that is needed to create a subsystem is to create a class that implements the `Subsystem` interface:
+The recommended method to create a subsystem for most users is to subclass the abstract `SendableSubsystemBase` class:
+
+```java
+import edu.wpi.first.wpilibj.experimental.command.SendableSubsystemBase;
+
+public class ExampleSubsystem extends SendableSubsystemBase {
+  // Your subsystem code goes here!
+}
+```
+
+This class contains a few convenience features on top of the basic `Subsystem` interface: it automatically calls the `register()` method in its constructor to register the subsystem with the scheduler (this is necessary for the `periodic()` method to be called when the scheduler runs), and also implements the `Sendable` interface so that it can be sent to the dashboard to display/log relevant status information.
+
+This is not required, however; advanced users seeking more flexibility are able to simply create a class that implements the `Subsystem` interface:
 
 ```java
 import edu.wpi.first.wpilibj.experimental.command.Subsystem;
@@ -74,16 +86,6 @@ public class ExampleSubsystem implements Subsystem {
   public ExampleSubsystem() {
     register(); // Registers this subsystem with the scheduler so that its periodic method will be called.
   }
-}
-```
-
-Notice that all methods in `Subsystem` are defaulted, so the user is not *required* to override anything.  While this is an entirely reasonable and correct way to create a subsystem, it has a few minor drawbacks: in particular, subsystems must call their `register()` method to register themselves with the scheduler in order for their periodic methods to be called when the scheduler runs (otherwise, the scheduler has no way of knowing that they are there!).  Additionally, users may want to leverage the ability to log their subsystem's current status on the robot dashboard, which is not supported by the baseline `Subsystem` interface.  To address this, new users are encouraged to instead subclass the abstract `SendableSubsystemBase` class, which implements the `Subsystem` interface and automatically registers the subsystem with the scheduler upon construction, as well as implementing the `Sendable` interface so that it can be sent to the robot dashboard:
-
-```java
-import edu.wpi.first.wpilibj.experimental.command.SendableSubsystemBase;
-
-public class ExampleSubsystem extends SendableSubsystemBase {
-  // Your subsystem code goes here!
 }
 ```
 
@@ -144,7 +146,19 @@ Commands are simple state machines that perform high-level robot functions with 
 
 ## Creating commands
 
-As with subsystems, to create a command, a user only needs to make a class implementing the `Command` interface:
+Similarly to subsystems, the recommended method for most users to create a command is to subclass the abstract `SendableCommandBase` class:
+
+```java
+import edu.wpi.first.wpilibj.experimental.command.SendableCommandBase;
+
+public class ExampleCommand extends SendableCommandBase {
+  // Your command code goes here!
+}
+```
+
+As before, this contains several convenience features.  It automatically overrides the `getRequirements()` method for users, returning a list of requirements that is empty by default, but can be added to with the `addRequirements()` method.  It also implements the `Sendable` interface, and so can be sent to the dashboard - this provides a handy way for scheduling commands for testing (via a button on the dashboard) without needing to bind them to buttons on a controller.
+
+Also as before, advanced users seeking more flexibility are free to simply create their own class implementing the `Command` interface:
 
 ```java
 import java.util.Collections;
@@ -162,18 +176,6 @@ public class ExampleCommand implements Command {
   }
 }
 ```
-
-Again, as with subsystems, this is a perfectly fine way to create a command.  However, it is also slightly inconvenient.  Users are forced to override the `getRequirements()` method to declare subsystem requirements, which is cumbersome, and also as with subsystems users may wish to leverage the ability to send their commands to the dashboard (this provides a handy way to schedule commands for testing, as they can then be started from the dashboard).  It is therefore recommended that new users instead create commands by subclassing the abstract `SendableCommandBase` class:
-
-```java
-import edu.wpi.first.wpilibj.experimental.command.SendableCommandBase;
-
-public class ExampleCommand extends SendableCommandBase {
-  // Your command code goes here!
-}
-```
-
-Requirements can then be declared simply by calling the `addRequirements()` method.
 
 ## The structure of a command
 
