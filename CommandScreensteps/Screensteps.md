@@ -308,3 +308,40 @@ public class DefaultDrive extends SendableCommandBase {
 ```
 
 Notice that this command does not override `isFinished()`, and thus will never end; this is the norm for commands that are intended to be used as default commands (and, as can be guessed, the library includes tools to make this kind of command easier to write, too!) (TODO: add link to relevant section).
+
+#Command groups
+
+Individual commands are capable of accomplishing a large variety of robot tasks, but the simple three-state format can quickly become cumbersome when more advanced functionality requiring extended sequences of robot tasks or coordination of multiple robot subsystems is required.  In order to accomplish this, users are encouraged to use the powerful command group functionality included in the command-based library.
+
+As the name suggests, command groups are combinations of multiple commands.  The act of combining multiple objects (such as commands) into a bigger object is known as [composition](https://en.wikipedia.org/wiki/Object_composition).  Command groups *compose* multiple commands into a *composite* command.  This allows code to be kept much cleaner and simpler, as the individual *component* commands may be written independently of the code that combines them, greatly reducing the amount of complexity at any given step of the process.
+
+Most importantly, however, command groups *are themselves commands* - they implement the `Command` interface.  This allows command groups to be [recursively composed](https://en.wikipedia.org/wiki/Object_composition#Recursive_composition) - that is, a command group may contain *other command groups* as components.
+
+## Types of command groups
+
+The command-based library supports four basic types of command groups: `SequentialCommandGroup`, `ParallelCommandGroup`, `ParallelRaceGroup`, and `ParallelDeadlineGroup`.  Each of these command groups combines multiple commands into a composite command - however, they do so in different ways:
+
+```java
+SequentialCommandGroup(Command... commands)
+```
+
+A `SequentialCommandGroup` runs a list of commands in sequence - the first command will be executed, then the second, then the third, and so on until the list finishes.  The sequential group finishes after the last command in the sequence finishes.  It is therefore usually important to ensure that each command in the sequence does actually finish (if a given command does not finish, the next command will never start!).
+
+```
+ParallelCommandGroup(Command... commands)
+```
+
+A `ParallelCommandGroup` runs a set of commands concurrently - all commands will execute at the same time.  The parallel group will end when all commands have finished.
+
+```
+ParallelRaceGroup(Command... commands)
+```
+
+A `ParallelRaceGroup` is much like a `ParallelCommandgroup`, in that it runs a set of commands concurrently.  However, the race group ends as soon as any command in the group ends - all other commands are interrupted at that point.
+
+```
+ParallelDeadlineGroup(Command deadline, Command... commands)
+```
+
+A `ParallelDeadlineGroup` also runs a set of commands concurrently.  However, the deadline group ends when a *specific* command (the "deadline") ends, interrupting all other commands in the group that are still running at that point.
+
