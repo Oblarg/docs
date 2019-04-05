@@ -441,7 +441,83 @@ Apart from autonomous commands, which are scheduled at the start of the autonomo
 
 As mentioned earlier, command-based is a [declarative](https://en.wikipedia.org/wiki/Declarative_programming) paradigm.  Accordingly, binding buttons to commands is done declaratively; the association of a button and a command is "declared" once, during robot initialization.  The library then does all the hard work of checking the button state and scheduling (or cancelling) the command as needed, behind-the-scenes.  Users only need to worry about designing their desired UI setup - not about implementing it!
 
-Command binding is done through the `Trigger` class and its subclasses (TODO: link).
+Command binding is done through the `Trigger` class and its various `Button` subclasses (TODO: link).
+
+## Trigger/Button bindings
+
+There are a number of bindings available for the `Trigger` class.  All of these bindings will automatically schedule a command when a certain trigger activation event occurs - however, each binding has different specific behavior.  `Button` and its subclasses have bindings with identical behaviors, but slightly different names that better-match a button rather than an arbitrary triggering event.
+
+### whenActive/whenPressed
+
+```java
+trigger.whenActive(Command command)
+```
+
+```java
+button.whenPressed(Command command)
+```
+
+This binding schedules a command when a trigger changes from inactive to active (or, accordingly, when a button changes is initially pressed).  The command will be scheduled on the iteration when the state changes, and will not be scheduled again unless the trigger becomes inactive and then active again (or the button is released and then re-pressed).
+
+### whileActiveContinuous/whileHeld
+
+```java
+trigger.whileActiveContinuous(Command command)
+```
+
+```java
+button.whileHeld(Command command)
+```
+
+This binding schedules a command repeatedly while a trigger is active (or, accordingly, while a button is held), and cancels it when the trigger becomes inactive (or when the button is released).  Note that scheduling an already-running command has no effect; but if the command finishes while the trigger is still active, it will be re-scheduled.
+
+### whileActiveOnce/whenHeld
+
+```java
+trigger.whileActiveOnce(Command command)
+```
+
+```java
+button.whenHeld(Command command)
+```
+
+This binding schedules a command when a trigger changes from inactive to active (or, accordingly, when a button is initially pressed) and cancels it when the trigger becomes inactive again (or the button is released).  The command will *not* be re-scheduled if it finishes while the trigger is still active.
+
+### whenInactive/whenReleased
+
+```java
+trigger.whenInactive(Command command)
+```
+
+```java
+button.whenReleased(Command command)
+```
+
+This binding schedules a command when a trigger changes from active to inactive (or, accordingly, when a button is initially released).  The command will be scheduled on the iteration when the state changes, and will not be re-scheduled unless the trigger becomes active and then inactive again (or the button is pressed and then re-released).
+
+### toggleWhenActive/toggleWhenPressed
+
+```java
+trigger.toggleWhenActive(Command command)
+```
+
+```java
+button.toggleWhenPressed(Command command)
+```
+
+This binding toggles a command, scheduling it when a trigger changes from inactive to active (or a button is initially pressed), and cancelling it under the same condition if the command is currently running.  Note that while this functionality is supported, toggles are *not* a highly-recommended option for user control, as they require the driver to mentally keep track of the robot state.
+
+### cancelWhenActive/cancelWhenPressed
+
+```java
+trigger.cancelWhenActive(Command command)
+```
+
+```java
+button.cancelWhenPressed(Command command)
+```
+
+This binding cancels a command when a trigger changes from inactive to active (or, accordingly, when a button is initially pressed).  the command is canceled on the iteration when the state changes, and will not be canceled again unless the trigger becomes inactive and then active again (or the button is released and re-pressed).  Note that cancelling a command that is not currently running has no effect.
 
 ## Binding a command to a joystick button
 
@@ -469,6 +545,30 @@ leftStick.getButton(Joystick.Button.kTrigger.value) // Returns the JoystickButto
 ```java
 driverController.getButton(XboxController.Button.kX.value) // Returns the JoystickButton object 
                                                            // corresponding to the `X` button of driverController
+```
+
+### Binding a command to a JoystickButton
+
+Putting it all together, it is very simple to bind a button to a JoystickButton:
+
+```java
+// Binds an ExampleCommand to be scheduled when the trigger of the left joystick is pressed
+leftStick.getButton(Joystick.Button.kTrigger.value).whenPressed(new ExampleCommand());
+```
+
+```java
+// Binds an ExampleCommand to be scheduled when the `X` button of the driver gamepad is pressed
+driverController.getButton(XboxController.Button.kX.value).whenPressed(new ExampleCommand());
+```
+
+It is useful to note that the command binding methods all return the trigger/button that they were initially called on, and thus can be chained to bind multiple commands to different states of the same button.  For example:
+
+```java
+driverController.getButton(XboxController.Button.kX.value)
+    // Binds a FooCommand to be scheduled when the `X` button of the driver gamepad is pressed
+    .whenPressed(new FooCommand());
+    // Binds a BarCommand to be scheduled when that same button is released
+    .whenReleased(new BarCommand());
 ```
 
 # PID control through PIDSubsystems and PIDCommands
