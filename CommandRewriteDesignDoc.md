@@ -161,7 +161,7 @@ ParallelDeadlineGroup(Command deadline, Command... commands)
 ```
 The first two are self-explanatory.  
 
-`ParallelRaceGeoup` is a parallel command group that terminates when *any one* of the included commands finishes.  All other commands are interrupted at that point.
+`ParallelRaceGroup` is a parallel command group that terminates when *any one* of the included commands finishes.  All other commands are interrupted at that point.
 
 `ParallelDeadlineGroup` is a parallel command group that terminates when a specified one of the included commands (the "deadline") finishes.  All other commands that are still running at that point are interrupted.
 
