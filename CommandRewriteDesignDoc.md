@@ -5,7 +5,7 @@ The WPILib Command-based framework has been a staple of FRC Java and C++ robot c
 
 However, the libraries used in the framework are now more than a decade old.  Many of the particular choices in their implementation are obsolete, and others are messy, difficult-to-maintain, and/or confusingly-conceived.  Given the confusing nature of much of the implementation, bringing the API up to modern standards is a difficult task, and the libraries have ended up in a "stasis" of sorts.
 
-To document will describe the goals, design choices, and implementation of a ground-up rewrite of the Command-based libraries aimed at alleviating these issues.
+This document will describe the goals, design choices, and implementation of a ground-up rewrite of the Command-based libraries aimed at alleviating these issues.
 
 
 ## Why rewrite the framework? (Problem Summary)
@@ -209,7 +209,7 @@ void cancelCommand(Command... commands);
 void cancelAll();
 ```
 
-Forceably ends the given commands, if they are currently scheduled.  The commands will have `end(true)` called, rather than `end(false)` methods.  Note that a command can be cancelled ever if it is not scheduled as `interruptible` - the `interruptible` tag *only* determines if the command can be interrupted by *another command* through its requirements.
+Forceably ends the given commands, if they are currently scheduled.  The commands will have `end(true)` called, rather than `end(false)` methods.  Note that a command can be cancelled even if it is not scheduled as `interruptible` - the `interruptible` tag *only* determines if the command can be interrupted by *another command* through its requirements.
 
 ##### Querying command state
 
