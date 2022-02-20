@@ -62,3 +62,13 @@ The implementation of the code-driven layout configuration in Shuffleboard invol
 ### Obscure calls for simple functions
 
 The simplest way to log telemetry to the dashboard declaratively is through a `SmartDashboard` method, despite `SmartDashboard` being a nearly-obsolete legacy framework with no active maintenance.  As Glass does not have its own API, ahe `Shuffleboard` API is rather verbose, `SmartDashboard` calls are often used even in codebases that never actually open `SmartDashboard`.  This is not ideal.
+
+It is also very unclear whether `put*` calls should be at startup or periodically, and the optional `name`/`key` parameter increases the confusion even more.
+
+### Multiple separate APIs for defining subsystem/device properties
+
+A subsystem (or device--there is very little difference at this level) currently needs to declare its properties multiple times: once for telemetry/NT, once for simulation, and possibly more. NT and simulation being relatively simialar isn't new, and is evident from classes such as `Field2d` and `Mechanism2d` being migrated rather easily from a simulation backend to an NT one. The WS setup used primarily for the Romi bots is also very similar to NT and sim. Merging NT and simulation setups would decrease boilerplate in both team and library code. Developing sim extensions/plugins would also become easier, partially due to HALSim extensions currently needing to be written in C++ while a connection to NT can be implemented in nearly any programming language (for starters, NT APIs exist for Java, Python, JS, and more).
+
+### Values being sent multiple times under different keys
+
+Assuming all data available is sent, there are multiple values duplicated when a system is published. This is commonly due to re-sending of values with a different key which is shorter, more concise, and more expressive for the specific mechanism (this problem becomes even more complicated when a single system has multiple devices with similar properties--in that case, the last part of the key isn't enough to distinguish between readings). Another possible cause can be units: a situation where the data is originally published in some unit while the team wants the data in another. This causes redundant data to be sent over NT, a problem due to the bandwidth limit. A solution similar to symlinks (where a single, stable string value would point to the data instead of duplicating multiple fields) could handle the first cause. The second case, derived values, is more complicated but can still be achieved to some level using metadata.
