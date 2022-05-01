@@ -28,6 +28,10 @@ In particular:
 
 Under the current ecosystem, effective users will likely want to make use of both Shuffleboard and Glass, while ignoring the LabView dashboard and SmartDashboard.  However, the documentation and API shapes do not necessarily lead users to this conclusion.  Moreover, developer effort is difficult to split between two tools, but the current distribution of features between tools demands it.
 
+### Shuffleboard performance/maintenance status
+
+Shuffleboard is, essentially, stable abandonware.  However, it has a number of known performance issues and complaints about stability, resource use, and general user experience remain frequent year-after-year.  Given the lack of JavaFX developer impetus/availability/expertise on the WPILib team, and the irrelevance of the platform to the current software "zeitgeist," this is a major stumbling block so long as Shuffleboard's core value-add features (user-code-configurable tab/layout telemetry/dashboard viewer) remain non-duplicated within the ecosystem.
+
 ### Overloading of the Sendable implementation
 
 On the surface, the `Sendable` interface offers a powerful abstraction to teams who wish to log their state declaratively rather than imperatively.  However, behind-the-scenes `Sendable` pulls double-duty as the backbone of the `LiveWindow` implementation, which is responsible for auto-populating a list of sensors and actuators for easy debugging.
@@ -49,6 +53,14 @@ The command scheduler implements `NTSendable` in a fairly ad hoc way (the functi
 
 While the NT architecture supports hierarchical structures (albeit indirectly through parsing of key names), the `Sendable` API only allows *flat* composition (excluding the aforementioned `Subsytem` tagging in the `LiveWindow` registry, which most teams are probably not aware of for the reasons mentioned in the previous section).  That is, child objects that implement `Sendable` can *only* be made to place their logged fields directly in the table entry of their parent.  This makes it very hard to scale `Sendable` in a sensible way, and can cause namespace collisions even in projects small enough to avoid the scaling issues.
 
+### Poorly-documented LiveWindow functionality
+
+LiveWindow achieves a coherent feature-set, but it is not well-documented what this feature-set actually is or why it contains the features that it does.  The intention that LiveWindow be used to bypass user code entirely is difficult to maintain from a code standpoint, and the cost is harder still to justify when most users do not seem to be aware of the design intent and tend to avoid the feature entirely.
+
+### Poorly-documented Sendable functionality
+
+`Sendable` only calls bound listeners when in `LiveWindow` mode, making the listener handles on `Sendablebuilder` mostly useless despite no indication of such in the API documentation or related tutorials.  As mentioned above, this is a wart due almost entirely due to the intermixture of `Sendable`'s telemetry and troubleshooting functionalities.
+
 ### Verbose Shuffleboard API
 
 The Shuffleboard API is extremely powerful and allows more or less the entire dashboard layout to be declaratively structured from robot code.  The native API for this, however, is verbose and not self-documenting.  Simple declarations require long method chains, and widget arguments are passed via string key-value pairs without type safety.
@@ -57,9 +69,9 @@ The Shuffleboard API is extremely powerful and allows more or less the entire da
 
 Both the new datalogging implementation and NT4 include support for string-valued metadata.  The implementation of the code-driven layout configuration in Shuffleboard involves an ad-hoc formatting metadata layer that is not shared by any of the other tooling.
 
-Since these metadata layers are incompatible, any effort spent on Shuffleboard widgets is useless for the newer Glass-based tooling.  Were these metadata layers compatible (ideally, identical), then Shuffleboard features could be gradually migrated to the newer dashboard without any need to change the robot-side API.
+Since these metadata layers are incompatible, any effort spent on Shuffleboard widgets is useless for the newer Glass-based tooling.  Were these metadata layers compatible (ideally, identical), then Shuffleboard features can smoothly interop with Glass and other more-modern dashboards (including, potentially, a web-based successor to Shuffleboard).
 
-This seems to have been the original intent of Shuffleboard's metadata structure and adherence to generic string-string maps for widget properties.
+This seems to have been the original intent of Shuffleboard's metadata structure and adherence to generic string-string maps for widget properties.  Building along these lines preserves much of the design work that went into the tool.
 
 ### Obscure calls for simple functions
 
@@ -78,3 +90,239 @@ To leverage NT for this purpose, we first need to clarify and refine the declara
 ### Values being sent multiple times under different keys
 
 Assuming all data available is sent, there are often multiple values duplicated when a system is published. This is commonly due to re-sending of values with a different key which is shorter, more concise, and more expressive for the specific mechanism (this problem becomes even more complicated when a single system has multiple devices with similar properties--in that case, the last part of the key isn't enough to distinguish between readings). Another possible cause can be units: a situation where the data is originally published in some unit while the team wants the data in another. This causes redundant data to be sent over NT, a problem due to the bandwidth limit. A solution similar to symlinks (where a single, stable string value would point to the data instead of duplicating multiple fields) could handle the first cause. The second case, derived values, is more complicated but can still be achieved to some level using metadata.
+
+## Solutions
+
+The above problems are substantial.  Fortunately, many of the fixes are potentially simple, and build off of initiatives already being undertaken by current WPILib team members.
+
+### Unified NT4/DataLogging/Shuffleboard metadata format
+
+The new on-RIO datalog implementation ships with support for per-entry string-valued metadata.  The spec for NT4 includes support for the same. Both are ostensibly a JSON spec - this is convenient, because WPILib can "reserve" properties in the metadata JSON for its own purposes, and past that the spec can be left open for users to expand as they wish.  With the growing stability, accessibility, and popularity of web dashboards, a JSON spec will allow smooth interop with custom user solutions and potentially with future directions for WPILib itself.
+
+This is a natural point of departure for a unified telemetry metadata spec - if Shuffleboard, in particular, can be migrated to this new spec, then the path forward for development and consolidation of dashboard tooling becomes vastly easier.  In particular, features from Shuffleboard that *must* be migrated include:
+
+* Display name
+* Size
+* Position
+* Tabs
+* Layouts
+* Widget type
+* Data-specific display parameters
+
+Features that are not yet supported, but which have obvious/immediate uses and would integrate cleanly with existing infrastructure include:
+
+* Measured unit/dimension
+* Update frequency (for telemetry)
+* Command-based structure (subsystem tags)
+* Actuation safety (for telemetry consumers)
+
+NT4 metadata is per-topic; the hierarchical structure imposed via path dividers is not reflected in the implementation structure and so keys in the path do not necessarily have direct representation in the communications layer.  Shuffleboard requires metadata about the aggregation (widget type, layout size/positioning, etc) to function.  Accordingly, we need to reserve a topic name for our aggregations, even if no messages are emitted on that topic.  This may seem like a stumbling point, but can be easily overcome by simply publishing a single dummy message at the aggregation path and then attaching metadata to that key.
+
+A tentative metadata spec can be seen below:
+
+```typescript
+{
+  // Display name
+  name: string,
+  // Widget or layout size
+  size: { vertical: number, horizontal: number, unit: string },
+  // Type of layout or display widget
+  displayType: "tab" | "list" | "grid" | string,
+  // Widget or layout position
+  position: { vertical: number, horizontal: number, unit: string},
+  // Graphing parameters
+  graph: { 
+    // Axis labels
+    labels: {
+      x: string,
+      y: string,
+    },
+    // Axis bounds
+    limits: {
+      // e.g. [0, 10]
+      x: number[]
+      y: number[]
+    }
+  },
+  // Unit of measure (if a scalar quantity)
+  unit: string,
+  // Update rate for robot-side code
+  updatePeriodMs: number,
+  // Name of the robot subsystem to which these data are associated
+  subsystem: string,
+  // Whether or not the value controls a robot actuation (if a scalar quantity)
+  actuator: boolean
+}
+```
+
+#### Metadata builders
+
+The use of JSON-string metadata is extremely convenient, but requires some sugar on the robot-code API side to work well.  A good pattern for this would be to encode consuming JSON specifications as JSON string builders:
+
+```java
+// Matching possible spec above
+String metadata = new DashboardMetadata()
+  // Can encode display type for supported dashboards as enums
+  .withType(ShuffleboardWidgets::kGraph)
+  .build();
+
+// Static methods can be added to bootstrap common configurations without the clutter
+// Equivalent to above
+String metadata = DashboardMetadata.graph().build();
+```
+
+WPILib APIs will prefer to handle metadata as the abovementioned builder class, as opposed to in string value.  "Escape hatches" for raw string values and for Jackson `JsonNode` representations will be provided via `fromString` or `fromJsonNode` methods on the builder class.
+
+### Deprecate all existing SmartDashboard and Shuffleboard methods, replace with implementation-neutral equivalents
+
+With an implementation-neutral metadata spec available, telemetry publishing is no longer tightly coupled to the user's choice of dashboard.  Accordingly, there is no need to maintain separate `SmartDashboard` and `Shuffleboard` APIs.  In fact, it is not necessary for the API shape itself to contain any reference to the dashboard implementation or spec - this will be done only where it is convenient and reduces boilerplate in user code.
+
+The unified replacement API will look something like:
+
+```java
+// Simple imperative logging directly delegates to NT4
+Telemetry.publishDouble("key", value);
+// Metadata can be added with builder pattern
+Telemetry.publishDouble("key", value)
+  // Accepts metadata builders as arguments
+  .withMetadata(DashboardMetadata.graph());
+// Can support dimensions through the API by delegating to metadata (C++ could use templates and be smarter)
+Telemetry.publishQuantity("key", value, "meters");
+
+// Declarative binding with suppliers/consumers
+Telemetry.publishDouble("key", () -> value);
+Telemetry.subscribeDouble("key", (double value) -> doThing(value));
+
+// Declarative binding of mutable classes similar to `putData(Sendable)` in existing impl
+// Optional final metadata string for aggregation
+var telemetryBinding = Telemetry.bind("key", telemetryNode)
+  .withMetadata(DashboardMetadata.layout());
+// Unbind later if needed (for cleanup etc)
+telemetryBinding.unbind();
+```
+
+Metadata for a given topic will be deep-merged into the existing metadata as they are introduced.  There does not seem to be any need for a system to remove metadata - such an interaction would be a code smell.
+
+### Replace Sendable with new, cleaner API
+
+`Sendable` should be replaced by a new interface, `TelemetryNode`.  The API shape for this will be fundamentally similar to `Sendable`:
+
+```java
+public interface TelemetryNode {
+  void bind(TelemetryBuilder builder);
+}
+```
+
+The "bind" method fulfills the role of `initSendable`, with a few key differences:
+
+Unlike `Sendable`, both `TelemetryNode` will support hierarchical nesting of implementing objects - that is, in addition to exposing binding handles for fields of primitive data type, it will allow *entire* `TelemetryNode`s to be added as children:
+
+```java
+@Override
+public void bind(TelemetryBuilder builder) {
+  // Add a `TelemetryNode` as a child; similarly-shaped API to ordinary binding
+  builder.bind("child", childNode);
+}
+```
+
+No auto-registration will be supported.  `TelemetryNode`s will only have their listeners bound if explicitly bound, either as a root node or as a child.
+
+Publishing and subscribing will no longer be overloaded onto a single `addProperty` method of the builder, since they only rarely overlap in practice:
+
+```java
+@Override
+public void bind(TelemetryBuilder builder) {
+  // API here matches the ordinary Telemetry API
+  builder
+    // Metadata is instead optional last param due to existing builder pattern
+    .publishDouble("publishedValue", () -> value, DashboardMetadata.graph())
+    // Metadata on subscriptions can be used to control input widget type
+    .subscribeDouble("subscribedValue", (double value) -> { doThing(double); }, DashboardMetadata.slider());
+}
+```
+
+#### Breaking out of the object tree
+
+It's sometimes useful to bind fields or children to paths that do not necessarily follow the in-code object tree - for example, to put certain data under a shared "diagnostics" aggregation even when it is held across different classes in code.
+
+To do this, users can call `bind`, `publish`, or `subscribe` directly on `Telemetry` instead of on the `TelemetryBuilder`.  The APIs will be identically-shaped, and will differ only in the property path locations.
+
+#### Annotation support (Java only)
+
+There has been an intent to upstream [Oblog](http://github.com/oblarg/oblog), which is a Shuffleboard wrapper, for a number of years.  This was delayed due to COVID, and given the substantial shifts in the landscape since the last revision to Oblog (notably, NT4), the strategy for mainlining an annotation-based telemetry wrapper has become quite a bit simpler.
+
+Oblog's core functionality revolves around two annotations: `@Log` and `@Config`.  The former is used to declaratively bind fields or getters to publish data to Shuffleboard (or NetworkTables), and the latter is used to bind fields or setters to listen to changes on a published field on Shuffleboard (or NetworkTables).
+
+This design closely overlaps the existing `Sendable` implementation, and the migration to `TelemetryNode` makes the structure even more amenable to a direct adaptation.  Similarly to Oblog, two primary annotations are needed: `@Publish` and `@Subscribe`, which function largely as sugar for the methods seen above.
+
+Annotation processing in Oblog is performed at runtime.  This is often avoided due to cost concerns, but Oblog caches all relevant reflection results on boot and there is essentially no additional performance cost subsequently.  This architecture should be used again, here - it is simple and it avoids many of the hard limitations (and tooling costs) of compile-time annotation processing.
+
+Accordingly, annotation processing will be done upon initial binding of the `TelemetryNode` instance.  Upon a call to `Telemetry.bind`, WPILib will dynamically search for `@Publish` and `@Subscribe` annotations on class members, and perform the analogous function calls that the user would have otherwise defined in the body of `TelemetryNode.bind`. 
+
+So, roughly,
+
+```java
+@Publish
+double publishedValue;
+```
+
+will perform (through reflection)
+
+```java
+@Override
+public void bind(TelemetryBuilder builder) {
+  builder
+    .publishDouble("publishedValue", () -> publishedValue);
+}
+```
+
+Annotation-bound telemetry fields will be added *before* the call to the user-defined override of `TelemetryNode.bind`, so that the latter (and more expressive) syntax has the final say.
+
+In the general case, metadata can be handled by a `@Metadata` annotation, which will offer all of the flat (scalar) properties supported by the `DashboardMetadata` builder.  Nested metadata types (such as the "graph" or "position" properties in the spec above) require a bit more nuance, but can be handled with nested annotations:
+
+```java
+@Publish
+@Metadata(
+  graph = @Metadata.Graph(
+    limits = @Metadata.Graph.Limits(x = {0, 10}))
+  )
+)
+double graphedValue;
+```
+
+Convenience handles to certain metadata specs can be achieved via sub-annotations of `@Publish` and `@Subscribe`:
+
+```java
+// equivalent to above
+@Publish.Graph(
+  limits = @Metadata.Graph.Limits(x = {0, 10})
+)
+double graphedValue;
+```
+
+Since `TelemetryNode` natively supports hierarchical nesting, Oblog's previously-weighty reflection-based structure inference can be abandoned; it, too, can now be implemented as sugar on the existing `TelemetryNode` implementation through a final annotation, `@Bind`, with
+
+```java
+// Add a TelemetryNode as a child
+@Bind
+TelemetryNode child;
+```
+
+being roughly equivalent to
+
+```java
+@Override
+public void bind(TelemetryBuilder builder) {
+  builder
+    .bind(child);
+}
+```
+
+To break out of the object tree with annotations, pass a value to the optional "path" parameter of appropriate annotation:
+
+```java
+
+@Publish(path="diagnostics")
+double publishedValue;
+```
+
