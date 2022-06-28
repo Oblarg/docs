@@ -116,34 +116,12 @@ Features that are not yet supported, but which have obvious/immediate uses and w
 * Command-based structure (subsystem tags)
 * Actuation safety (for telemetry consumers)
 
-NT4 metadata is per-topic; the hierarchical structure imposed via path dividers is not reflected in the implementation structure and so keys in the path do not necessarily have direct representation in the communications layer.  Shuffleboard requires metadata about the aggregation (widget type, layout size/positioning, etc) to function.  Accordingly, we need to reserve a topic name for our aggregations, even if no messages are emitted on that topic.  This may seem like a stumbling point, but can be easily overcome by simply publishing a single dummy message at the aggregation path and then attaching metadata to that key.
-
-A tentative metadata spec can be seen below:
+Only some of these features are metadata of the telemetry topics themselves - others are metadata of dashboard display widget.  A tentative spec for metadata of a NT4 telemetry topic can be seen below:
 
 ```typescript
 {
-  // Display name
+  // Display name (default, can be overridden at the widget level)
   name: string,
-  // Widget or layout size
-  size: { vertical: number, horizontal: number, unit: string },
-  // Type of layout or display widget
-  displayType: "tab" | "list" | "grid" | string,
-  // Widget or layout position
-  position: { vertical: number, horizontal: number, unit: string},
-  // Graphing parameters
-  graph: { 
-    // Axis labels
-    labels: {
-      x: string,
-      y: string,
-    },
-    // Axis bounds
-    limits: {
-      // e.g. [0, 10]
-      x: number[]
-      y: number[]
-    }
-  },
   // Unit of measure (if a scalar quantity)
   unit: string,
   // Update rate for robot-side code
@@ -155,23 +133,59 @@ A tentative metadata spec can be seen below:
 }
 ```
 
-#### Metadata builders
+Dashboard widgets require slightly more involved handling, which is discussed below:
 
-The use of JSON-string metadata is extremely convenient, but requires some sugar on the robot-code API side to work well.  A good pattern for this would be to encode consuming JSON specifications as JSON string builders:
+### Reserved metadata topic for dashboard layout definition
 
-```java
-// Matching possible spec above
-String metadata = new DashboardMetadata()
-  // Can encode display type for supported dashboards as enums
-  .withType(ShuffleboardWidgets::kGraph)
-  .build();
+Shuffleboard defines tabs, layouts, and widgets in a set of metadata tables, which themselves are ordinary NT entries, and the tab/layout/widget hierarchy is represented by the pathstrings used for the entry keys.  These entries live under a reserved `metadata` content root.
 
-// Static methods can be added to bootstrap common configurations without the clutter
-// Equivalent to above
-String metadata = DashboardMetadata.graph().build();
+With the addition of an explicit JSON metadata layer to NT4, we can replaec this entirely with a *single* JSON document that defines the structure of the dashboard, located under the `dashboard` topic.  This might look something like so:
+
+```typescript
+{
+  tabs: [
+    {
+      name: 'drive',
+      elements: [
+        {
+          // display name
+          name: 'Heading',
+          // widget type
+          type: 'gyro',
+          // we can point to the widget data by NT4 topic pathstring
+          data: 'drive/heading'
+        },
+        {
+          name: 'Wheel Velocities',
+          type: 'graph',
+          // multi-value plots easily represented in JSON with array type
+          data: ['drive/leftVelocity', 'drive/rightVelocity'],
+          // we can easily spec for display parameters per widget type
+          graph: {
+            limits: {
+              x: [0, 10],
+              y: [-50, 50]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
 ```
 
-WPILib APIs will prefer to handle metadata as the abovementioned builder class, as opposed to in string value.  "Escape hatches" for raw string values and for Jackson `JsonNode` representations will be provided via `fromString` or `fromJsonNode` methods on the builder class.
+A simple builder API, similar to the current Shuffleboard API, can allow dashboard configuration from robot code:
+
+```java
+var exampleTab = Telemetry.getDashboardTab("Drive");
+exampleTab.addWidget(new Widgets.Gyro("Heading", "drive/heading"))
+  // Graph widget ctor can be variadic to handle multiple data sources
+  .addWidget(new Widgets.Graph("Wheel Speeds", "drive/leftVelocity", "drive/rightVelocity")
+    .withXLimits(0, 10)
+    .withYLimits(-50, 50));
+```
+
+The above differs from the Shuffleboard API in that it has direct programmatic representation for widgets in the form of the widget classes (e.g. `Widget.Gyro`).  Shuffleboard only exposes a generic string-valued `withProperties` decorator, which does not provide type safety for user-specified widget properties.
 
 ### Deprecate all existing SmartDashboard and Shuffleboard methods, replace with implementation-neutral equivalents
 
@@ -182,10 +196,6 @@ The unified replacement API will look something like:
 ```java
 // Simple imperative logging directly delegates to NT4
 Telemetry.publishDouble("key", value);
-// Metadata can be added with builder pattern
-Telemetry.publishDouble("key", value)
-  // Accepts metadata builders as arguments
-  .withMetadata(DashboardMetadata.graph());
 // Can support dimensions through the API by delegating to metadata (C++ could use templates and be smarter)
 Telemetry.publishQuantity("key", value, "meters");
 
@@ -195,8 +205,7 @@ Telemetry.subscribeDouble("key", (double value) -> doThing(value));
 
 // Declarative binding of mutable classes similar to `putData(Sendable)` in existing impl
 // Optional final metadata string for aggregation
-var telemetryBinding = Telemetry.bind("key", telemetryNode)
-  .withMetadata(DashboardMetadata.layout());
+var telemetryBinding = Telemetry.bind("key", telemetryNode);
 // Unbind later if needed (for cleanup etc)
 telemetryBinding.unbind();
 ```
@@ -234,10 +243,8 @@ Publishing and subscribing will no longer be overloaded onto a single `addProper
 public void bind(TelemetryBuilder builder) {
   // API here matches the ordinary Telemetry API
   builder
-    // Metadata is instead optional last param due to existing builder pattern
-    .publishDouble("publishedValue", () -> value, DashboardMetadata.graph())
-    // Metadata on subscriptions can be used to control input widget type
-    .subscribeDouble("subscribedValue", (double value) -> { doThing(double); }, DashboardMetadata.slider());
+    .publishDouble("publishedValue", () -> value)
+    .subscribeDouble("subscribedValue", (double value) -> { doThing(double); });
 }
 ```
 
@@ -278,24 +285,17 @@ public void bind(TelemetryBuilder builder) {
 
 Annotation-bound telemetry fields will be added *before* the call to the user-defined override of `TelemetryNode.bind`, so that the latter (and more expressive) syntax has the final say.
 
-In the general case, metadata can be handled by a `@Metadata` annotation, which will offer all of the flat (scalar) properties supported by the `DashboardMetadata` builder.  Nested metadata types (such as the "graph" or "position" properties in the spec above) require a bit more nuance, but can be handled with nested annotations:
-
 ```java
 @Publish
-@Metadata(
-  graph = @Metadata.Graph(
-    limits = @Metadata.Graph.Limits(x = {0, 10}))
-  )
-)
 double graphedValue;
 ```
 
-Convenience handles to certain metadata specs can be achieved via sub-annotations of `@Publish` and `@Subscribe`:
+Metadata (such as dimensions) can be specified via annotation parameters:
 
 ```java
 // equivalent to above
-@Publish.Graph(
-  limits = @Metadata.Graph.Limits(x = {0, 10})
+@Publish(
+  unit="meters"
 )
 double graphedValue;
 ```
@@ -321,7 +321,6 @@ public void bind(TelemetryBuilder builder) {
 To break out of the object tree with annotations, pass a value to the optional "path" parameter of appropriate annotation:
 
 ```java
-
 @Publish(path="diagnostics")
 double publishedValue;
 ```
