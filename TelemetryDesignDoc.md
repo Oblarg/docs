@@ -116,7 +116,7 @@ Features that are not yet supported, but which have obvious/immediate uses and w
 * Command-based structure (subsystem tags)
 * Actuation safety (for telemetry consumers)
 
-Only some of these features are metadata of the telemetry topics themselves - others are metadata of dashboard display widget.  A tentative spec for metadata of a NT4 telemetry topic can be seen below:
+Only some of these features are metadata of the telemetry topics themselves - others are essentially dashboard formatting info, which should be kept separate from metadata about the inherent properties of the published telemetry.  Dashboard layout will be discussed in a later section; a tentative spec for metadata of a NT4 telemetry topic can be seen below:
 
 ```typescript
 {
