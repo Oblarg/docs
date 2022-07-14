@@ -22,7 +22,7 @@ The current API presents new users with a number of pain points.  Firstly, users
 
 In particular:
 
-* The LabView dashboard and SmartDashboard are largely legacy features that have been totally supplanted in functionality by Shuffleboard and Glass.  Neither is likely to be easily maintainable in the event of a major breakage.  Both options are substantially clunkier and less-functional than the alternatives, and teams which choose these dashboards are probably worse-off for the choice.  Is continued support for legacy team-side dashboard code really worth this cost, especially given the tendency of FRC teams to rewrite most of their code anually?
+* SmartDashboard is largely a legacy feature that has been totally supplanted in functionality by Shuffleboard and Glass.  It is not likely to be easily maintainable in the event of a major breakage.  It is substantially clunkier and less-functional than the alternatives, and teams which use SmartDashboard at this point are probably worse-off for the choice.  Is continued support for legacy team-side dashboard code really worth this cost, especially given the tendency of FRC teams to rewrite most of their code anually?
 * ShuffleBoard is clearly superior to Glass as an operating dashboard, and has many features (robot-code-driven tabs and layouts, data recording and playback) that make it appealing as the "default" robot dashboard.  However, it is already in danger of slipping into the "legacy code" state of the above two tools due to the migration of developer effort to Glass.  This could eventually cost teams if support for the dashboard becomes difficult to sustain while no other dashboard option offers a similar featureset.
 * Glass is a *fantastic* tool for real-time plotting and signal analysis, but currently lacks a robust featureset to be usable as a dashboard.
 
@@ -43,9 +43,9 @@ The `LiveWindow` design philosophy holds that all sensor and actuator objects in
 * Sendables can be registered with `LiveWindow` even if they have no business being there (i.e. they are not a sensor or an actuator).
 * It is not documented which `Sendable`s automatically add themselves to the `LiveWindow` registry immediately upon construction, and the application of the `Sendable` interface to certain classes which would otherwise be able to provide useful telemetry to teams (e.g. the various pneumatics classes) has been delayed or abandoned due to the complexities of maintaining a such a static registry, even when the classes could feasibly implement the interface and expose themselves to users sans automatic registration.
   
-### Crude interaction between Sendable and Commands
+### Crude/confusing interaction between Sendable and Commands
 
-Parts of the `Sendable` interface - particulary those involving the `LiveWindow` registry - have hard dependencies on the design philosophy of the Command-based framework.  In particular, `LiveWindow` widgets are grouped by "subsystem," even though they are populated automatically on robots that may not have recognizable `Subsystem` classes.  The relevant values are silently defaulted - and the functionality rendered useless - in all but a very narrow set of circumstances.
+Parts of the `Sendable` interface - particulary those involving the `LiveWindow` registry - have hard dependencies on the design philosophy of the Command-based framework.  In particular, `LiveWindow` widgets are grouped by "subsystem," even though they are populated automatically on robots that may not have recognizable `Subsystem` classes.  This naming paradigm is confusing, as it implies a structural link between the library features when in fact there is none - the interaction is very shallow, and the grouping is usable even without the command framework.  This currently exists entirely in the robot code as a tacked-on feature in the `Sendable` class, when it could be better handled through the metadata layer.
 
 The command scheduler implements `NTSendable` in a fairly ad hoc way (the functionality was copied directly from the original command framework to allow backwards compatibility, which may have been a mistake).  This is one of the few major reliances on `NTSendable` remaining in the codebase, and may present an opportunity to remove the dependency entirely.
 
@@ -56,6 +56,8 @@ While the NT architecture supports hierarchical structures (albeit indirectly th
 ### Poorly-documented LiveWindow functionality
 
 LiveWindow achieves a coherent feature-set, but it is not well-documented what this feature-set actually is or why it contains the features that it does.  The intention that LiveWindow be used to bypass user code entirely is difficult to maintain from a code standpoint, and the cost is harder still to justify when most users do not seem to be aware of the design intent and tend to avoid the feature entirely.
+
+If `Sendable` is deprecated (per the recommendations later in this document), the "test mode" features of `LiveWindow` should still eventually be satisfied by *some* robot-side API.  This API can (and should) be designed with a narrower scope than `Sendable`, which will also help to document it and explain it to teams.
 
 ### Poorly-documented Sendable functionality
 
@@ -81,13 +83,11 @@ Moreover, the various `put` functions for both `SmartDashboard` and `Shuffleboar
 
 ### Redundant APIs for defining subsystem/device properties
 
-A subsystem (or device--there is very little difference at this level) currently needs to declare its properties multiple times: once for telemetry/NT, once for simulation, and possibly more. NT and simulation being relatively simialar isn't new, and is evident from classes such as `Field2d` and `Mechanism2d` being migrated rather easily from a simulation backend to an NT one. The WS setup used primarily for the Romi bots is also very similar to NT and sim.
+A subsystem (or device--there is very little difference at this level) currently needs to declare its properties multiple times: once for telemetry/NT, once for simulation, and possibly more. NT and simulation share similar API shapes and required user input - `Field2d` and `Mechanism2d` were both migrated rather easily from a simulation backend to an NT one. The WS setup used primarily for the Romi bots is also very similar to NT and sim.
 
-While a longer-term goal, merging of NT and simulation would decrease boilerplate in both team and library code. Developing sim extensions/plugins would also become easier, partially due to HALSim extensions currently needing to be written in C++ while a connection to NT can be implemented in nearly any programming language (for starters, NT APIs exist for Java, Python, JS, and more).
+While a longer-term goal, merging of declaration syntax for NT and simulation would decrease boilerplate in both team and library code. With shared declarative infrastructure, we may also eventually be able to better-support custom NT and simulation plugins, or even support a universal data-based design where meaningful persistent state variables have a normalized canonical representation that is shared by different consumers (NT, simulation, etc).
 
-To leverage NT for this purpose, we first need to clarify and refine the declarative methods for binding in-code properties to fields on NT.
-
-### Values being sent multiple times under different keys
+### Values being sent multiple times under different keys (data normalization)
 
 Assuming all data available is sent, there are often multiple values duplicated when a system is published. This is commonly due to re-sending of values with a different key which is shorter, more concise, and more expressive for the specific mechanism (this problem becomes even more complicated when a single system has multiple devices with similar properties--in that case, the last part of the key isn't enough to distinguish between readings). Another possible cause can be units: a situation where the data is originally published in some unit while the team wants the data in another. This causes redundant data to be sent over NT, a problem due to the bandwidth limit. A solution similar to symlinks (where a single, stable string value would point to the data instead of duplicating multiple fields) could handle the first cause. The second case, derived values, is more complicated but can still be achieved to some level using metadata.
 
@@ -135,11 +135,11 @@ Only some of these features are metadata of the telemetry topics themselves - ot
 
 Dashboard widgets require slightly more involved handling, which is discussed below:
 
-### Reserved metadata topic for dashboard layout definition
+### Reserved NT topic for dashboard layout definition
 
 Shuffleboard defines tabs, layouts, and widgets in a set of metadata tables, which themselves are ordinary NT entries, and the tab/layout/widget hierarchy is represented by the pathstrings used for the entry keys.  These entries live under a reserved `metadata` content root.
 
-With the addition of an explicit JSON metadata layer to NT4, we can replaec this entirely with a *single* JSON document that defines the structure of the dashboard, located under the `dashboard` topic.  This might look something like so:
+Representing hierarchy with pathstrings is brittle, however, and not easily-translated across platforms.  We can sidestep this entirely with a *single* JSON document that defines the structure of the dashboard, published under the `dashboard` topic.  This might look something like so:
 
 ```typescript
 {
@@ -200,17 +200,31 @@ Telemetry.publishDouble("key", value);
 Telemetry.publishQuantity("key", value, "meters");
 
 // Declarative binding with suppliers/consumers
-Telemetry.publishDouble("key", () -> value);
-Telemetry.subscribeDouble("key", (double value) -> doThing(value));
+Telemetry.addDoublePublisher("key", () -> value);
+Telemetry.addDoubleSubscriber("key", (double value) -> doThing(value));
 
 // Declarative binding of mutable classes similar to `putData(Sendable)` in existing impl
 // Optional final metadata string for aggregation
 var telemetryBinding = Telemetry.bind("key", telemetryNode);
-// Unbind later if needed (for cleanup etc)
-telemetryBinding.unbind();
+// implements AutoCloseable for unbinding
+telemetryBinding.close();
 ```
 
-Metadata for a given topic will be deep-merged into the existing metadata as they are introduced.  There does not seem to be any need for a system to remove metadata - such an interaction would be a code smell.
+Metadata can be added to a topic with the `addMetadata` method, and a couple of wrapper/builder classes that encode the official metadata spec fields:
+
+```java
+// Place a topic in the "shooter" subsystem with a metadata tag
+Telemetry.addMetadata("key", new TelemetryMetadata().withSubsystem("Shooter"));
+
+// TelemetryMetadata can forward methods to the underlying Jackson JsonNode for metadata fields not in the spec
+metadata.put("key", "value");
+// Hierarchy methods from JsonNode can be forwarded, as well
+metadata.put("key", jsonNode);
+```
+
+### Adopt a canonical web dashboard replacement for SmartDashboard/Shuffleboard
+
+[frc-web-components](https://github.com/frc-web-components/frc-web-components) shows a viable architecture for a canonical HTML-based FRC dashboard.  Migrating to a web dashboard offers a number of potential benefits (larger potential developer pool, easier multi-platform support, ability to use a large number of modern UI toolkits, consistency with current trends in frontend application design), and should be relatively easy to do once the infrastructure (e.g. dashboard-config JSON) has been put in place.
 
 ### Replace Sendable with new, cleaner API
 
@@ -290,7 +304,7 @@ Annotation-bound telemetry fields will be added *before* the call to the user-de
 double graphedValue;
 ```
 
-Metadata (such as dimensions) can be specified via annotation parameters:
+Metadata (such as dimensions) can be specified via annotation parameters (these are optional, so this API shape makes sense here):
 
 ```java
 // equivalent to above
@@ -324,4 +338,3 @@ To break out of the object tree with annotations, pass a value to the optional "
 @Publish(path="diagnostics")
 double publishedValue;
 ```
-
